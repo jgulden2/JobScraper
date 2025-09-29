@@ -3,7 +3,7 @@ import json
 import time
 import base64
 import requests
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from scrapers.base import JobScraper
 
 

@@ -81,7 +81,7 @@ class RTXScraper(JobScraper):
 
             if len(all_jobs) >= job_limit:
                 if not self.suppress_console:
-                    print(f"RTX: Reached test job limit after initial page.")
+                    print("RTX: Reached test job limit after initial page.")
                 return all_jobs
 
             if not self.suppress_console:

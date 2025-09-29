@@ -1,8 +1,11 @@
 import time
 import re
+import html
+import json
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urlunparse, urlencode, parse_qsl
+from bs4 import BeautifulSoup as BS
 from scrapers.base import JobScraper
 
 
@@ -108,14 +111,11 @@ class NorthropGrummanScraper(JobScraper):
         return out
 
     def _parse_page_embed(self, html_text):
-        import json, html as _html
-        from bs4 import BeautifulSoup as _BS
-
-        soup = _BS(html_text, "html.parser")
+        soup = BS(html_text, "html.parser")
         code = soup.select_one("#smartApplyData")
         if not code:
             return {}
-        raw = _html.unescape(code.text)
+        raw = html.unescape(code.text)
         data = json.loads(raw)
         flat = self._flatten(data)
         if isinstance(data.get("positions"), list) and data["positions"]:
@@ -226,7 +226,7 @@ class NorthropGrummanScraper(JobScraper):
                     all_keys.update(rec.keys())
                     if not self.suppress_console:
                         print(
-                            f"Parsed job: {rec.get('Position Title','')} at {rec.get('Location','')}"
+                            f"Parsed job: {rec.get('Position Title', '')} at {rec.get('Location', '')}"
                         )
             except Exception as e:
                 if not self.suppress_console:

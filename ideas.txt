@@ -1,0 +1,171 @@
+Here are high-impact improvements and feature ideas, grounded in how the code works today.
+
+# Architecture & Code Quality
+
+1. Unify the scraper lifecycle
+   Right now, the base class exposes `scrape_jobs()` while most subclasses implement a custom `scrape()` that repeats orchestration (fetch → parse → append → export) in slightly different ways.
+
+* Introduce a single template method in `JobScraper` (e.g., `run()`), which: (a) calls `fetch_data()`, (b) loops `parse_job()`, (c) appends to `self.jobs`, (d) returns a normalized list.
+* Have each subclass only implement `fetch_data()` and `parse_job()`.
+* In `main.py`, call `scraper.run()` and then `scraper.export(...)` for consistent behavior across vendors.
+
+2. Standardize logging & “testing mode”
+   Several scrapers manually print or use logging and have ad-hoc `testing`/`suppress_console` flags.
+
+* Move `testing`, `suppress_console`, and the logger into `JobScraper` so subclasses inherit consistent logging, sampling, and verbosity.
+* Ensure `main.py` sets these properties on every instance (it partially does this already for `suppress_console` and `testing`).
+
+3. Type hints + docstrings
+   Add `typing` across base and scrapers for inputs/outputs (`List[Dict[str, Any]]`, etc.), and document expected fields produced by `parse_job()` (title, location, id, etc.).
+
+4. Resilient HTTP & parsing utilities
+
+* Centralize retry/backoff (e.g., exponential backoff, request timeouts) and HTML/JSON helpers in the base class so each scraper benefits (BAE/RTX rely on parsing `phApp.ddo`; Lockheed parses JSON-LD; GD/Northrop hit JSON APIs).
+* Add “schema guards” for site changes (e.g., graceful fallback if fields move/rename).
+
+5. Remove Selenium where possible; otherwise harden it
+   The RTX scraper requires `undetected_chromedriver` + Selenium to access page JS. Consider:
+
+* First try a plain `requests` fetch of the job detail page and parse `phApp.ddo` like BAE does; if it fails (e.g., anti-bot), then fall back to headless browser.
+* If keeping Selenium, add: headless mode, deterministic waits, automatic driver version management, and error snapshots (HTML dumps) when parsing fails.
+
+6. Consistent field schema & normalization
+   Each scraper produces overlapping but slightly different fields (e.g., Lockheed adds pay rate parsing; Northrop flattens lots of JSON keys).
+
+* Define a canonical schema (columns, types, allowed values), with company-specific extras carried in a `meta`/`extras` map.
+* Normalize boolean fields (e.g., `US Person Required`, `Relocation Available`) and dates (`Post Date`) to ISO.
+
+7. Dedupe & idempotency
+
+* Centralize dedupe logic (today BAE/RTX do job-id–based uniqueness locally; make this a base-class helper).
+* Add a content hash (title+location+company) fallback if a site lacks a stable ID.
+
+8. Config over code
+
+* Extract constants (base URLs, page sizes, delays, query params) into a YAML/TOML config that scrapers read on init. This reduces scattered literals (e.g., page sizes, start URLs).
+
+# Reliability, Performance & Ops
+
+9. Robust retries & rate limiting
+
+* Wrap all HTTP calls with retry+backoff and 429/5xx handling; add a per-host rate limiter to avoid bans.
+* Stagger page requests (`delay`) is present for Lockheed; apply consistently and configure per site.
+
+10. Concurrency where safe
+
+* For API-based scrapers (GD, Northrop), parallelize page fetches within rate limits.
+* For detail pages (Lockheed, BAE, RTX), use a thread pool—with bounded concurrency and retry—to speed up parse phase.
+
+11. Incremental crawling & change tracking
+
+* Persist a “last seen” watermark per site (latest posting date or page token).
+* Track job lifecycle: first_seen, last_seen, status (active/expired), and detect diffs (title/salary changed since last run).
+
+12. Storage: database + CSV
+
+* Export CSV for quick use (already present) but also upsert into SQLite/Postgres with unique constraint on `Posting ID` (plus `Company`/`Site`) to prevent duplicates and enable incremental runs.
+* Add a tiny ORM layer or well-defined SQL upserts.
+
+13. Structured errors and metrics
+
+* Emit structured logs and basic metrics: pages fetched, success/fail counts, parse errors per field/site, average latency per request.
+* Summarize at the end of each run (already partly done by several scrapers).
+
+14. CI, tests, fixtures
+
+* Unit tests for parsers with frozen HTML/JSON fixtures (e.g., saved `phApp.ddo` payloads, JSON-LD, API responses).
+* Use `responses`/`requests-mock` to simulate network.
+* Add contract tests: “If the site drops key X, fail loudly.”
+* Smoke tests using a tiny `--testing` run (CLI already supports a testing flag).
+
+15. Scheduling & containerization
+
+* Add a Dockerfile, and a cron/k8s Job example for scheduled runs.
+* Environment-driven config for headless browser and proxies.
+
+16. Legal/ethical guardrails
+
+* Centralize robots.txt/TOS checks and a friendly `User-Agent` string (some are already set per scraper).
+* Respect crawl delays; provide “dry-run” and per-domain throttle.
+
+# Data Quality & Enrichment
+
+17. Geocoding & normalization
+
+* Normalize `Location` to City/Region/Country fields; optionally geocode to lat/long for maps and distance filters.
+
+18. Salary normalization
+
+* There’s ad-hoc pay parsing for Lockheed/RTX. Generalize this into a library that:
+
+  * Extracts ranges (min/max), currency, and cadence (hourly/yearly).
+  * Converts to a canonical annualized figure with provenance.
+
+19. Clearance & citizenship extraction
+
+* Multiple scrapers infer `US Person Required` or extract clearance levels from description text.
+* Centralize with regex/keyword lists + confidence scoring and explainability (“matched phrase: ‘TS/SCI’”).
+
+20. Skill/tag extraction
+
+* Parse `Required/Preferred Skills` into normalized tags (NLP phrase extraction with deterministic rules first).
+* Keep raw text fields too, but expose structured tags for analytics.
+
+21. De-duplication across companies
+
+* Sometimes the same role is posted under multiple brands/divisions. Add cross-site near-duplicate detection using title+normalized location+company domain and fuzzy matching.
+
+22. Canonical job URLs
+
+* Standardize `Detail URL` presence (present for GD/Northrop; ensure for all).
+* For sites that only expose JS payloads, synthesize a stable URL pattern.
+
+# Product & UX Additions
+
+23. Unified CLI ergonomics
+
+* `main.py` is solid; add `--all`, `--since YYYY-MM-DD`, `--limit N`, and `--output-dir` to simplify batch runs.
+* Add `--format parquet|csv|jsonl` and gzip support.
+
+24. Notifications & watchlists
+
+* Allow users to supply keyword/location filters and be alerted (email/webhook) on newly-seen matches.
+
+25. Simple REST API + dashboard
+
+* Expose a read-only API to query jobs by company, location, clearance, salary band, age.
+* A minimal dashboard (Streamlit/FastAPI+HTMX) for browsing, filtering, and exporting.
+
+26. Provenance & reproducibility
+
+* Store raw payload snapshots (as JSON/HTML) alongside parsed records in a `raw/` folder keyed by job ID for audit/debug.
+* Include parser version and run timestamp per record.
+
+27. Internationalization
+
+* Add locale awareness for date/number parsing and support for non-US postings (currency & date formats).
+
+# Project Hygiene
+
+28. Repository layout
+
+* Use a proper package layout: `scrapers/` (already), `cli/`, `tests/`, `configs/`, `scripts/`, `data/` (outputs), `raw/` (payloads).
+* Pin dependencies and add lockfile; provide `Makefile`/`tasks.py` tasks for `format`, `lint`, `test`, `run`.
+
+29. Secrets & env
+
+* Centralize environment configuration (proxies, headless flags) with `.env` and `pydantic-settings`/`dotenv`, not hard-coded values.
+
+30. Defensive flattening (Northrop)
+
+* The Northrop scraper flattens deeply nested JSON into many columns. Consider capping breadth: store a curated subset into top-level schema and put the rest into a `json` column (JSONB if Postgres) to avoid ever-growing CSV headers.
+
+---
+
+## Quick Wins (minimal code but big payoff)
+
+* Move `testing`, logging, and dedupe helpers into `JobScraper`; switch every scraper to call a standardized `run()` method.
+* Add retries/backoff + per-host rate limiting wrappers to `JobScraper` and reuse everywhere.
+* Define a canonical schema and normalize booleans/dates across scrapers before export.
+* Add a SQLite persistence layer with upserts to enable incremental runs and change tracking.
+* Replace ad-hoc salary and clearance parsing with centralized utilities (regex library + tests) used by all scrapers.
