@@ -28,6 +28,9 @@ class NorthropGrummanScraper(JobScraper):
         )
         self.session.get(self.START_URL, timeout=30)
 
+    def raw_id(self, raw_job):
+        return raw_job.get("ats_job_id") or raw_job.get("pid")
+
     def fetch_data(self):
         start = 0
         num = 100
@@ -94,47 +97,47 @@ class NorthropGrummanScraper(JobScraper):
             )
         return jobs
 
-    def _flatten(self, obj, prefix="", out=None):
+    def flatten(self, obj, prefix="", out=None):
         if out is None:
             out = {}
         if isinstance(obj, dict):
             for k, v in obj.items():
-                self._flatten(v, f"{prefix}{k}." if prefix else f"{k}.", out)
+                self.flatten(v, f"{prefix}{k}." if prefix else f"{k}.", out)
         elif isinstance(obj, list):
             if all(isinstance(x, (str, int, float, bool)) or x is None for x in obj):
                 out[prefix[:-1]] = "; ".join("" if x is None else str(x) for x in obj)
             else:
                 for i, v in enumerate(obj):
-                    self._flatten(v, f"{prefix}{i}.", out)
+                    self.flatten(v, f"{prefix}{i}.", out)
         else:
             out[prefix[:-1]] = "" if obj is None else obj
         return out
 
-    def _parse_page_embed(self, html_text):
+    def parse_page_embed(self, html_text):
         soup = BS(html_text, "html.parser")
         code = soup.select_one("#smartApplyData")
         if not code:
             return {}
         raw = html.unescape(code.text)
         data = json.loads(raw)
-        flat = self._flatten(data)
+        flat = self.flatten(data)
         if isinstance(data.get("positions"), list) and data["positions"]:
-            pos = self._flatten(data["positions"][0])
+            pos = self.flatten(data["positions"][0])
             for k, v in pos.items():
                 flat[f"positions.0.{k}"] = v
         return flat
 
-    def parse_job(self, job):
-        pid = job.get("pid") or job.get("ats_job_id")
+    def parse_job(self, raw_job):
+        pid = raw_job.get("pid") or raw_job.get("ats_job_id")
         if not pid:
             return None
 
         base = {
-            "Position Title": job.get("title", ""),
-            "Location": job.get("location", ""),
-            "Job Category": job.get("category", ""),
-            "Posting ID": job.get("ats_job_id") or job.get("pid"),
-            "Detail URL": job.get("detail_url", ""),
+            "Position Title": raw_job.get("title", ""),
+            "Location": raw_job.get("location", ""),
+            "Job Category": raw_job.get("category", ""),
+            "Posting ID": raw_job.get("ats_job_id") or raw_job.get("pid"),
+            "Detail URL": raw_job.get("detail_url", ""),
         }
 
         jr = self.session.get(
@@ -142,7 +145,7 @@ class NorthropGrummanScraper(JobScraper):
         )
         if jr.status_code == 200:
             j = jr.json()
-            flat = self._flatten(j)
+            flat = self.flatten(j)
             desc = j.get("job_description") or j.get("description") or ""
             quals = j.get("qualifications") or ""
             pref = j.get("preferred_qualifications") or ""
@@ -169,7 +172,7 @@ class NorthropGrummanScraper(JobScraper):
             return base
 
         url = (
-            job.get("detail_url")
+            raw_job.get("detail_url")
             or f"https://jobs.northropgrumman.com/careers/job/{pid}"
         )
         u = urlparse(url)
@@ -181,7 +184,7 @@ class NorthropGrummanScraper(JobScraper):
         r = self.session.get(url, timeout=30)
         if r.status_code != 200:
             return base
-        flat_page = self._parse_page_embed(r.text)
+        flat_page = self.parse_page_embed(r.text)
         desc = (
             flat_page.get("positions.0.job_description")
             or flat_page.get("job_description")

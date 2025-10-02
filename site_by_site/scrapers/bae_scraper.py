@@ -15,6 +15,9 @@ class BAESystemsScraper(JobScraper):
             headers={"User-Agent": "Mozilla/5.0"},
         )
 
+    def raw_id(self, raw_job):
+        return raw_job.get("jobId")
+
     def extract_total_results(self, phapp_data):
         return int(phapp_data.get("eagerLoadRefineSearch", {}).get("totalHits", 0))
 

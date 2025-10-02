@@ -15,7 +15,7 @@ def run_scraper(scraper_name, suppress_console, testing=False):
         scraper.suppress_console = suppress_console
     scraper.testing = testing
 
-    scraper.scrape()
+    scraper.run()
     scraper.export(f"{scraper_name}_jobs.csv")
     print(f"Finished {scraper_name}.\n")
 

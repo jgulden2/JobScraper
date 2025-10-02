@@ -2,10 +2,23 @@ import logging
 import json
 import time
 import re
+import os
 import requests
 import undetected_chromedriver as uc
 from scrapers.base import JobScraper
 from selenium.webdriver.support.ui import WebDriverWait
+
+
+# Silence UC's noisy destructor on Windows (enabled by default; set env var to 0 to disable)
+if os.name == "nt" and os.environ.get("RTX_SILENCE_UC_DEL", "1") == "1":
+    try:
+
+        def noop(self):
+            return None
+
+        uc.Chrome.__del__ = noop
+    except Exception:
+        pass
 
 
 class RTXScraper(JobScraper):
@@ -25,6 +38,9 @@ class RTXScraper(JobScraper):
         self.job_detail_url_template = "https://careers.rtx.com/global/en/job/{job_id}/"
         self.page_size = 10
         self.suppress_console = False
+
+    def raw_id(self, raw_job):
+        return raw_job.get("jobId")
 
     def extract_phapp_ddo(self, html):
         pattern = re.compile(r"phApp\.ddo\s*=\s*(\{.*?\});", re.DOTALL)
@@ -117,7 +133,7 @@ class RTXScraper(JobScraper):
                     print(f"RTX: Fetched {len(jobs)} jobs from offset {offset}")
 
                 offset += self.page_size
-                time.sleep(1)  # Politeness delay
+                time.sleep(1)
 
         finally:
             driver.quit()
@@ -154,8 +170,8 @@ class RTXScraper(JobScraper):
                 return section.lstrip(": ").strip()
         return ""
 
-    def parse_job(self, job):
-        job_id = job.get("jobId")
+    def parse_job(self, raw_job):
+        job_id = raw_job.get("jobId")
         detail = self.fetch_job_detail(job_id)
         description_html = detail.get("description", "")
         clean_desc = self.clean_html(description_html)
@@ -198,8 +214,8 @@ class RTXScraper(JobScraper):
         )
 
         return {
-            "Position Title": job.get("title"),
-            "Location": job.get("cityStateCountry"),
+            "Position Title": raw_job.get("title"),
+            "Location": raw_job.get("cityStateCountry"),
             "Job Category": detail.get("category", ""),
             "Posting ID": job_id,
             "Post Date": detail.get("dateCreated"),

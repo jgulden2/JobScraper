@@ -15,7 +15,10 @@ class LockheedMartinScraper(JobScraper):
         self.visited_job_ids = set()
         self.max_pages = max_pages
         self.delay = delay
-        self.suppress_console = False  # For compatibility
+        self.suppress_console = False
+
+    def raw_id(self, raw_job):
+        return raw_job.get("job_id")
 
     def fetch_data(self):
         total_pages = self.get_total_pages()
