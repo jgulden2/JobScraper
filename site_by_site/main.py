@@ -14,7 +14,7 @@ def run_scraper(scraper_name, testing=False):
     scraper.testing = testing
 
     scraper.run()
-    scraper.export(f"{scraper_name}_jobs.csv")
+    scraper.export(f"scraped_data/{scraper_name}_jobs.csv")
     print(f"Finished {scraper_name}.\n")
 
 
