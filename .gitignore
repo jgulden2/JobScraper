@@ -1,0 +1,7 @@
+site_by_site/run.log
+site_by_site/northropgrumman_jobs.csv
+site_by_site/rtx_jobs.csv
+site_by_site/lockheedmartin_jobs.csv
+site_by_site/baesystems_jobs.csv
+site_by_site/generaldynamics_jobs.csv
+site_by_site/scrapers/__pycache__

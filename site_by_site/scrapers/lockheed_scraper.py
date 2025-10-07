@@ -23,8 +23,6 @@ class LockheedMartinScraper(JobScraper):
     def fetch_data(self):
         total_pages = self.get_total_pages()
         job_limit = 15 if getattr(self, "testing", False) else float("inf")
-        if getattr(self, "testing", False) and not self.suppress_console:
-            print(f"Running in testing mode — limiting to {job_limit} job postings.")
 
         if getattr(self, "testing", False):
             total_pages = 1
@@ -33,8 +31,7 @@ class LockheedMartinScraper(JobScraper):
 
         all_job_links = []
         for page_num in range(1, total_pages + 1):
-            if not self.suppress_console:
-                print(f"Scraping search page {page_num}/{total_pages}")
+            self.log("list:page", page=page_num, total_pages=total_pages)
             page_links = self.get_job_links(page_num)
             for link in page_links:
                 if len(all_job_links) >= job_limit:
@@ -74,8 +71,7 @@ class LockheedMartinScraper(JobScraper):
         return job_links
 
     def scrape_job_detail(self, url, job_id):
-        if not self.suppress_console:
-            print(f"Scraping job detail: {url}")
+        self.log("detail:fetch", url=url)
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
@@ -87,8 +83,7 @@ class LockheedMartinScraper(JobScraper):
                 clean_json = re.sub(r"[\x00-\x1F\x7F]", "", json_ld.string)
                 job_data = json.loads(clean_json)
             except json.JSONDecodeError as e:
-                if not self.suppress_console:
-                    print(f"Warning: JSON-LD parse failed for {url}: {e}")
+                self.log("detail:jsonld_error", level="warning", url=url, error=str(e))
 
         def extract_or_empty(field, default=""):
             return job_data.get(field, default)

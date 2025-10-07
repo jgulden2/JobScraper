@@ -50,11 +50,8 @@ class BAESystemsScraper(JobScraper):
         phapp_data = self.extract_phapp_ddo(html)
         total_results = self.extract_total_results(phapp_data)
 
-        if getattr(self, "testing", False) and not self.suppress_console:
-            print(f"Running in testing mode — limiting to {job_limit} job postings.")
-
-        if not self.suppress_console:
-            print(f"Total job postings: {total_results}")
+        # Logging handled centrally; keep info messages here
+        self.log("source:total", total=total_results)
 
         while offset < total_results and len(all_jobs) < job_limit:
             page_url = f"{self.base_url}?from={offset}&s=1"
@@ -70,14 +67,12 @@ class BAESystemsScraper(JobScraper):
             )
 
             if not jobs:
-                if not self.suppress_console:
-                    print("No jobs returned, stopping.")
+                self.log("list:done", reason="empty")
                 break
 
             all_jobs.extend(jobs)
 
-            if not self.suppress_console:
-                print(f"Fetched {len(jobs)} jobs from offset {offset}")
+            self.log("list:fetched", count=len(jobs), offset=offset)
 
             offset += page_size
 

@@ -76,13 +76,7 @@ class RTXScraper(JobScraper):
 
             total_results = self.extract_total_results(phapp_data)
 
-            if getattr(self, "testing", False) and not self.suppress_console:
-                print(
-                    f"Running in testing mode — limiting to {job_limit} job postings."
-                )
-
-            if not self.suppress_console:
-                print(f"RTX: Total job postings: {total_results}")
+            self.log("source:total", total=total_results)
 
             jobs = (
                 phapp_data.get("eagerLoadRefineSearch", {})
@@ -95,12 +89,10 @@ class RTXScraper(JobScraper):
                 all_jobs.append(job)
 
             if len(all_jobs) >= job_limit:
-                if not self.suppress_console:
-                    print("RTX: Reached test job limit after initial page.")
+                self.log("list:done", reason="test_limit_initial")
                 return all_jobs
 
-            if not self.suppress_console:
-                print(f"RTX: Fetched {len(jobs)} jobs from initial page")
+            self.log("list:fetched", count=len(jobs), offset=0)
 
             offset += self.page_size
 
@@ -119,8 +111,7 @@ class RTXScraper(JobScraper):
                 )
 
                 if not jobs:
-                    if not self.suppress_console:
-                        print("RTX: No jobs returned, stopping.")
+                    self.log("list:done", reason="empty")
                     break
 
                 for job in jobs:
@@ -128,8 +119,7 @@ class RTXScraper(JobScraper):
                         break
                     all_jobs.append(job)
 
-                if not self.suppress_console:
-                    print(f"RTX: Fetched {len(jobs)} jobs from offset {offset}")
+                self.log("list:fetched", count=len(jobs), offset=offset)
 
                 offset += self.page_size
                 time.sleep(1)

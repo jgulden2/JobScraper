@@ -11,9 +11,21 @@ class JobScraper:
         self.jobs = []
         self.testing = False
         self.test_limit = 15
-        self.suppress_console = False
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.LoggerAdapter(
+            logging.getLogger(self.__class__.__name__),
+            {"scraper": self.__class__.__name__.replace("Scraper", "").lower()},
+        )
         self.log_every = 25
+
+    def fmt_pairs(self, **kv):
+        if not kv:
+            return ""
+        parts = [f"{k}={v}" for k, v in kv.items()]
+        return " " + " ".join(parts)
+
+    def log(self, event, level="info", **kv):
+        msg = f"{event}{self.fmt_pairs(**kv)}"
+        getattr(self.logger, level)(msg)
 
     def fetch_data(self):
         raise NotImplementedError
@@ -60,14 +72,16 @@ class JobScraper:
         return out
 
     def run(self):
-        self.logger.info("fetch:start")
+        self.log("fetch:start")
         data = self.fetch_data()
         if self.testing:
+            # Central, consistent testing enforcement + message
+            self.log("testing:limit", limit=self.test_limit)
             data = data[: self.test_limit]
-        self.logger.info(f"fetch:done n={len(data)}")
+        self.log("fetch:done", n=len(data))
         data = self.dedupe_raw(data)
-        self.logger.info(f"dedupe_raw:unique={len(data)}")
-        self.logger.info(f"parse:start total={len(data)}")
+        self.log("dedupe_raw:unique", n=len(data))
+        self.log("parse:start", total=len(data))
         parsed = []
         for idx, raw in enumerate(data, 1):
             try:
@@ -75,13 +89,13 @@ class JobScraper:
                 if rec:
                     parsed.append(rec)
                     if idx == 1 or idx % self.log_every == 0:
-                        self.logger.info(f"parse:progress idx={idx}/{len(data)}")
+                        self.log("parse:progress", idx=idx, total=len(data))
             except Exception:
                 self.logger.exception("parse:error")
         parsed = self.dedupe_records(parsed)
         self.jobs = parsed
-        self.logger.info(f"dedupe_records:unique={len(self.jobs)}")
-        self.logger.info(f"done count={len(self.jobs)}")
+        self.log("dedupe_records:unique", n=len(self.jobs))
+        self.log("done", count=len(self.jobs))
 
     def export(self, filename):
         df = pd.DataFrame(self.jobs)

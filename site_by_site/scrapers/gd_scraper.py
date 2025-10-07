@@ -300,11 +300,11 @@ class GeneralDynamicsScraper(JobScraper):
                 break
             if not results:
                 break
-        if not self.suppress_console:
-            dur = time.time() - start_time
-            print(
-                f"GeneralDynamics: collected {len(jobs)} search-result rows in {dur:.2f}s"
-            )
+
+        dur = time.time() - start_time
+        self.logger.info(
+            f"GeneralDynamics: collected {len(jobs)} search-result rows in {dur:.2f}s"
+        )
         return jobs
 
     def parse_job(self, raw_job):

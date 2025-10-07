@@ -3,7 +3,7 @@ import logging
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
 
-def run_scraper(scraper_name, suppress_console, testing=False):
+def run_scraper(scraper_name, testing=False):
     scraper_class = SCRAPER_MAPPING.get(scraper_name)
     if not scraper_class:
         print(f"Unknown scraper: {scraper_name}")
@@ -11,8 +11,6 @@ def run_scraper(scraper_name, suppress_console, testing=False):
 
     print(f"Running {scraper_name} scraper... (testing={testing})")
     scraper = scraper_class()
-    if hasattr(scraper, "suppress_console"):
-        scraper.suppress_console = suppress_console
     scraper.testing = testing
 
     scraper.run()
@@ -56,12 +54,26 @@ if __name__ == "__main__":
     if not log_handlers:
         log_handlers.append(logging.NullHandler())
 
-    logging.root.handlers = []
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=log_handlers,
-    )
+    class ScraperField(logging.Filter):
+        def filter(self, record):
+            if not hasattr(record, "scraper"):
+                record.scraper = ""
+            return True
+
+    fmt = "%(asctime)s [%(levelname)s] %(scraper)s %(message)s"
+    formatter = logging.Formatter(fmt)
+
+    root = logging.getLogger()
+    root.handlers = []
+    root.setLevel(logging.INFO)
+    for h in log_handlers:
+        h.setFormatter(formatter)
+        h.addFilter(ScraperField())
+        root.addHandler(h)
+
+    logging.getLogger("undetected_chromedriver").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("selenium").setLevel(logging.WARNING)
 
     for scraper_name in args.scrapers or SCRAPER_MAPPING.keys():
-        run_scraper(scraper_name, args.suppress, testing=args.testing)
+        run_scraper(scraper_name, testing=args.testing)

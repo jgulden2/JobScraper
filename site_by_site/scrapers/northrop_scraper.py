@@ -1,4 +1,3 @@
-import time
 import re
 import html
 import json
@@ -61,8 +60,7 @@ class NorthropGrummanScraper(JobScraper):
 
             batch = data.get("positions", [])
             got = len(batch)
-            if not self.suppress_console:
-                print(f"page {page_idx} start={start} got={got} url={r.url}")
+            self.log("list:page", page=page_idx, start=start, got=got, url=r.url)
 
             if not batch:
                 break
@@ -92,10 +90,8 @@ class NorthropGrummanScraper(JobScraper):
             if start >= total_count:
                 break
 
-        if not self.suppress_console:
-            print(
-                f"NorthropGrumman: Fetched {len(jobs)} jobs via API; reported total={data.get('count')}"
-            )
+        self.log("source:total", total=data.get("count"))
+        self.log("list:fetched", count=len(jobs))
         return jobs
 
     def flatten(self, obj, prefix="", out=None):
@@ -213,34 +209,3 @@ class NorthropGrummanScraper(JobScraper):
         text = soup.get_text().lower()
         match = re.search(r"(secret|top secret|ts/sci|public trust)", text)
         return match.group(0).title() if match else ""
-
-    def scrape(self):
-        start_time = time.time()
-        jobs_data = self.fetch_data()
-        if getattr(self, "testing", False):
-            jobs_data = jobs_data[:20]
-
-        records = []
-        all_keys = set()
-        for job in jobs_data:
-            try:
-                rec = self.parse_job(job)
-                if rec:
-                    records.append(rec)
-                    all_keys.update(rec.keys())
-                    if not self.suppress_console:
-                        print(
-                            f"Parsed job: {rec.get('Position Title', '')} at {rec.get('Location', '')}"
-                        )
-            except Exception as e:
-                if not self.suppress_console:
-                    print(f"Detail parse failed: {e}")
-
-        header = sorted(all_keys)
-        normalized = [{k: r.get(k, "") for k in header} for r in records]
-        self.jobs = normalized
-
-        total_duration = time.time() - start_time
-        print(
-            f"{len(self.jobs)} Northrop Grumman job postings collected in {total_duration:.2f} seconds."
-        )
