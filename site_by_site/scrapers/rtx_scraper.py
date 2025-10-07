@@ -1,4 +1,3 @@
-import logging
 import json
 import time
 import re
@@ -231,36 +230,3 @@ class RTXScraper(JobScraper):
             "Preferred Skills": preferred_skills,
             "Job Description": clean_desc,
         }
-
-    def scrape(self):
-        start_time = time.time()
-        message = "Starting RTX scrape process"
-        logging.info(message) if not self.suppress_console else print(message)
-
-        jobs_data = self.fetch_data()
-
-        unique_jobs = {}
-        for job in jobs_data:
-            job_id = job.get("jobId")
-            if job_id and job_id not in unique_jobs:
-                unique_jobs[job_id] = job
-
-        message = f"Initial RTX scrape complete: {len(unique_jobs)} unique jobs found."
-        logging.info(message) if not self.suppress_console else print(message)
-
-        for job in unique_jobs.values():
-            try:
-                job_info = self.parse_job(job)
-                if job_info:
-                    self.jobs.append(job_info)
-                    msg = f"Parsed RTX job: {job_info['Position Title']} at {job_info['Location']}"
-                    if not self.suppress_console and logging.getLogger().hasHandlers():
-                        logging.info(msg)
-            except Exception as e:
-                error_msg = f"Failed to parse RTX job ID {job.get('jobId')}: {e}"
-                if not self.suppress_console and logging.getLogger().hasHandlers():
-                    logging.error(error_msg)
-
-        total_duration = time.time() - start_time
-        final_msg = f"{len(self.jobs)} RTX job postings collected in {total_duration:.2f} seconds."
-        logging.info(final_msg) if not self.suppress_console else print(final_msg)

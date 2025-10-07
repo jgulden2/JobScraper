@@ -61,7 +61,8 @@ class NorthropGrummanScraper(JobScraper):
 
             batch = data.get("positions", [])
             got = len(batch)
-            print(f"page {page_idx} start={start} got={got} url={r.url}")
+            if not self.suppress_console:
+                print(f"page {page_idx} start={start} got={got} url={r.url}")
 
             if not batch:
                 break

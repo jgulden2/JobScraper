@@ -48,28 +48,6 @@ class LockheedMartinScraper(JobScraper):
     def parse_job(self, job_entry):
         return self.scrape_job_detail(job_entry["url"], job_entry["job_id"])
 
-    def scrape(self):
-        start_time = time.time()
-        jobs_data = self.fetch_data()
-
-        for job in jobs_data:
-            try:
-                details = self.parse_job(job)
-                if details:
-                    self.jobs.append(details)
-                    if not self.suppress_console:
-                        print(
-                            f"Parsed job: {details['Position Title']} at {details['Location']}"
-                        )
-            except Exception as e:
-                if not self.suppress_console:
-                    print(f"Failed to parse job ID {job['job_id']}: {e}")
-
-        total_duration = time.time() - start_time
-        print(
-            f"{len(self.jobs)} job postings collected in {total_duration:.2f} seconds."
-        )
-
     def get_total_pages(self):
         response = requests.get(self.SEARCH_URL, headers=self.headers)
         response.raise_for_status()

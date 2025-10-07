@@ -1,6 +1,4 @@
-import logging
 import json
-import time
 import re
 import requests
 from scrapers.base import JobScraper
@@ -111,45 +109,3 @@ class BAESystemsScraper(JobScraper):
             ),
             "Job Description": self.clean_html(detail.get("description", "")),
         }
-
-    def scrape(self):
-        start_time = time.time()
-        message = "Starting scrape process"
-        if self.suppress_console:
-            print(message)
-        else:
-            logging.info(message)
-
-        jobs_data = self.fetch_data()
-
-        unique_jobs = {}
-        for job in jobs_data:
-            job_id = job.get("jobId")
-            if job_id and job_id not in unique_jobs:
-                unique_jobs[job_id] = job
-
-        message = f"Initial scrape complete: {len(unique_jobs)} unique jobs found."
-        if self.suppress_console:
-            print(message)
-        else:
-            logging.info(message)
-
-        for job in unique_jobs.values():
-            try:
-                job_info = self.parse_job(job)
-                if job_info:
-                    self.jobs.append(job_info)
-                    message = f"Parsed job: {job_info['Position Title']} at {job_info['Location']}"
-                    if not self.suppress_console and logging.getLogger().hasHandlers():
-                        logging.info(message)
-            except Exception as e:
-                error_message = f"Failed to parse job ID {job.get('jobId')}: {e}"
-                if not self.suppress_console and logging.getLogger().hasHandlers():
-                    logging.error(error_message)
-
-        total_duration = time.time() - start_time
-
-        final_message = (
-            f"{len(self.jobs)} job postings collected in {total_duration:.2f} seconds."
-        )
-        print(final_message) if self.suppress_console else logging.info(final_message)
