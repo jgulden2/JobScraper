@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup as BS
 from math import ceil
 from urllib.parse import urlencode, urlunparse, urljoin
 from scrapers.base import JobScraper
+from traceback import format_exc
 
 
 class GeneralDynamicsScraper(JobScraper):
@@ -78,11 +79,12 @@ class GeneralDynamicsScraper(JobScraper):
                 parts.append(self.text(sib))
         # Normalize text
         value = " ".join(p.strip() for p in parts if p and p.strip())
-        return (
-            (list_items if list_items is not None else value).strip()
-            if isinstance(value, str)
-            else list_items
-        )
+        val_raw = list_items if list_items is not None else value
+        if isinstance(val_raw, list):
+            val = "\n".join(x.strip() for x in val_raw if isinstance(x, str))
+        else:
+            val = (val_raw or "").strip()
+        return val
 
     def extract_insets(self, soup: BS) -> dict:
         out = {}
@@ -254,17 +256,30 @@ class GeneralDynamicsScraper(JobScraper):
                 if e.response is not None and e.response.status_code == 400:
                     if use_facet:
                         use_facet = False
+                        self.log(
+                            "api:retry_mode",
+                            reason="400",
+                            use_facet=use_facet,
+                            page_size=page_size,
+                        )
                         continue
                     if page_size > 100:
                         offset = fetched
                         page_size = 100
                         page = offset // page_size
                         max_pages = None
+                        self.log(
+                            "api:retry_mode",
+                            reason="400",
+                            use_facet=use_facet,
+                            page_size=page_size,
+                        )
                         continue
                     break
                 raise
             if total is None:
                 total = int(data.get("ResultTotal") or 0)
+                self.log("source:total", total=total)
             if max_pages is None:
                 pc = data.get("PageCount")
                 pc = (
@@ -278,6 +293,7 @@ class GeneralDynamicsScraper(JobScraper):
                 else:
                     max_pages = pc or calc or None
             results = data.get("Results") or []
+            self.log("list:page", page=page, page_size=page_size, got=len(results))
             for item in results:
                 link = (item.get("Link") or {}).get("Url") or ""
                 if link:
@@ -302,12 +318,12 @@ class GeneralDynamicsScraper(JobScraper):
                 break
 
         dur = time.time() - start_time
-        self.logger.info(
-            f"GeneralDynamics: collected {len(jobs)} search-result rows in {dur:.2f}s"
-        )
+        self.log("list:fetched", count=len(jobs))
+        self.log("run:segment", segment="gd.fetch_data", seconds=round(dur, 3))
         return jobs
 
     def parse_job(self, raw_job):
+        warns = 0
         detail_rel = raw_job.get("detail_url", "")
         detail_url = self.absolute_url(detail_rel)
         record = {
@@ -318,10 +334,27 @@ class GeneralDynamicsScraper(JobScraper):
             "Posting ID": raw_job.get("id", ""),
         }
         try:
+            self.log("detail:fetch", url=detail_url)
             html = self.fetch_job_detail_html(detail_url)
             doc = self.parse_job_detail_doc(html)
             record.update(doc)
+        except requests.RequestException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            self.log(
+                "detail:http_error",
+                level="warning",
+                url=detail_url,
+                status=status,
+                error=format_exc(),
+            )
         except Exception:
-            # keep the listing data even if the detail parse fails
-            pass
+            self.log(
+                "detail:parse_error",
+                level="warning",
+                url=detail_url,
+                error=format_exc(),
+            )
+            warns += 1
+        if warns:
+            self.log("parse:errors_detail", n=warns)
         return record

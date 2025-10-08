@@ -4,6 +4,7 @@ from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
 
 def run_scraper(scraper_name, testing=False):
+    logging.getLogger(__name__).info("run:start", extra={"scraper": scraper_name})
     scraper_class = SCRAPER_MAPPING.get(scraper_name)
     if not scraper_class:
         print(f"Unknown scraper: {scraper_name}")
@@ -16,6 +17,7 @@ def run_scraper(scraper_name, testing=False):
     scraper.run()
     scraper.export(f"scraped_data/{scraper_name}_jobs.csv")
     print(f"Finished {scraper_name}.\n")
+    logging.getLogger(__name__).info("run:finish", extra={"scraper": scraper_name})
 
 
 if __name__ == "__main__":

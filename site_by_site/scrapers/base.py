@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+from time import time
 from bs4 import BeautifulSoup
 
 
@@ -72,6 +73,8 @@ class JobScraper:
         return out
 
     def run(self):
+        start = time()
+        errors = 0
         self.log("fetch:start")
         data = self.fetch_data()
         if self.testing:
@@ -91,11 +94,14 @@ class JobScraper:
                     if idx == 1 or idx % self.log_every == 0:
                         self.log("parse:progress", idx=idx, total=len(data))
             except Exception:
+                errors += 1
                 self.logger.exception("parse:error")
         parsed = self.dedupe_records(parsed)
         self.jobs = parsed
         self.log("dedupe_records:unique", n=len(self.jobs))
         self.log("done", count=len(self.jobs))
+        self.log("parse:errors", n=errors)
+        self.log("run:duration", seconds=round(time() - start, 3))
 
     def export(self, filename):
         df = pd.DataFrame(self.jobs)

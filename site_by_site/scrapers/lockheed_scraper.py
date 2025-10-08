@@ -4,6 +4,7 @@ import re
 import requests
 from scrapers.base import JobScraper
 from bs4 import BeautifulSoup
+from traceback import format_exc
 
 
 class LockheedMartinScraper(JobScraper):
@@ -22,6 +23,7 @@ class LockheedMartinScraper(JobScraper):
 
     def fetch_data(self):
         total_pages = self.get_total_pages()
+        self.log("list:pages", total_pages=total_pages)
         job_limit = 15 if getattr(self, "testing", False) else float("inf")
 
         if getattr(self, "testing", False):
@@ -31,8 +33,8 @@ class LockheedMartinScraper(JobScraper):
 
         all_job_links = []
         for page_num in range(1, total_pages + 1):
-            self.log("list:page", page=page_num, total_pages=total_pages)
             page_links = self.get_job_links(page_num)
+            self.log("list:fetched", page=page_num, count=len(page_links))
             for link in page_links:
                 if len(all_job_links) >= job_limit:
                     break
@@ -40,6 +42,7 @@ class LockheedMartinScraper(JobScraper):
 
             time.sleep(self.delay)
 
+        self.log("list:done", reason="end")
         return all_job_links
 
     def parse_job(self, job_entry):
@@ -82,8 +85,10 @@ class LockheedMartinScraper(JobScraper):
             try:
                 clean_json = re.sub(r"[\x00-\x1F\x7F]", "", json_ld.string)
                 job_data = json.loads(clean_json)
-            except json.JSONDecodeError as e:
-                self.log("detail:jsonld_error", level="warning", url=url, error=str(e))
+            except json.JSONDecodeError:
+                self.log(
+                    "detail:jsonld_error", level="warning", url=url, error=format_exc()
+                )
 
         def extract_or_empty(field, default=""):
             return job_data.get(field, default)

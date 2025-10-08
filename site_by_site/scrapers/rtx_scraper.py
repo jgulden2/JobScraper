@@ -6,6 +6,7 @@ import requests
 import undetected_chromedriver as uc
 from scrapers.base import JobScraper
 from selenium.webdriver.support.ui import WebDriverWait
+from traceback import format_exc
 
 
 # Silence UC's noisy destructor on Windows (enabled by default; set env var to 0 to disable)
@@ -61,12 +62,15 @@ class RTXScraper(JobScraper):
         options.add_argument("--window-size=1920,1200")
         options.add_argument("--no-sandbox")
 
+        self.log("driver:init")
         driver = uc.Chrome(options=options)
 
         try:
             # First page
             first_page_url = "https://careers.rtx.com/global/en/search-results"
             driver.get(first_page_url)
+
+            self.log("driver:wait", target="phApp.ddo")
 
             # Wait until phApp.ddo is present in the page's JS context
             WebDriverWait(driver, 30).until(
@@ -125,16 +129,34 @@ class RTXScraper(JobScraper):
                 time.sleep(1)
 
         finally:
+            self.log("driver:quit")
             driver.quit()
 
+        self.log("list:done", reason="end")
         return all_jobs
 
     def fetch_job_detail(self, job_id):
         url = self.job_detail_url_template.format(job_id=job_id)
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
+        self.log("detail:fetch", url=url)
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            self.log(
+                "detail:http_error",
+                level="warning",
+                url=url,
+                status=status,
+                error=format_exc(),
+            )
+            return {}
         html = response.text
-        phapp_data = self.extract_phapp_ddo(html)
+        try:
+            phapp_data = self.extract_phapp_ddo(html)
+        except Exception:
+            self.log("detail:parse_error", level="warning", url=url, error=format_exc())
+            return {}
         return phapp_data.get("jobDetail", {}).get("data", {}).get("job", {})
 
     def extract_salary_range(self, text):
@@ -162,6 +184,8 @@ class RTXScraper(JobScraper):
     def parse_job(self, raw_job):
         job_id = raw_job.get("jobId")
         detail = self.fetch_job_detail(job_id)
+        if not detail:
+            self.log("parse:errors_detail", n=1, reason="detail_empty", job_id=job_id)
         description_html = detail.get("description", "")
         clean_desc = self.clean_html(description_html)
 

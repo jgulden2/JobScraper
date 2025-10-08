@@ -92,6 +92,7 @@ class NorthropGrummanScraper(JobScraper):
 
         self.log("source:total", total=data.get("count"))
         self.log("list:fetched", count=len(jobs))
+        self.log("list:done", reason="end")
         return jobs
 
     def flatten(self, obj, prefix="", out=None):
@@ -127,6 +128,7 @@ class NorthropGrummanScraper(JobScraper):
     def parse_job(self, raw_job):
         pid = raw_job.get("pid") or raw_job.get("ats_job_id")
         if not pid:
+            self.log("parse:skip", reason="no_pid")
             return None
 
         base = {
@@ -137,6 +139,7 @@ class NorthropGrummanScraper(JobScraper):
             "Detail URL": raw_job.get("detail_url", ""),
         }
 
+        self.log("detail:fetch", kind="api", pid=pid)
         jr = self.session.get(
             f"{self.API_URL}/{pid}", params={"domain": "ngc.com"}, timeout=30
         )
@@ -166,6 +169,7 @@ class NorthropGrummanScraper(JobScraper):
             return rec
 
         if jr.status_code in (404, 405, 410):
+            self.log("detail:http_status", kind="api", status=jr.status_code, pid=pid)
             return base
 
         url = (
@@ -178,8 +182,10 @@ class NorthropGrummanScraper(JobScraper):
         url = urlunparse(
             (u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment)
         )
+        self.log("detail:fetch", kind="html", url=url, pid=pid)
         r = self.session.get(url, timeout=30)
         if r.status_code != 200:
+            self.log("detail:http_status", kind="html", status=r.status_code, pid=pid)
             return base
         flat_page = self.parse_page_embed(r.text)
         desc = (

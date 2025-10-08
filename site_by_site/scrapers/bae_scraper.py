@@ -2,6 +2,7 @@ import json
 import re
 import requests
 from scrapers.base import JobScraper
+from traceback import format_exc
 
 
 class BAESystemsScraper(JobScraper):
@@ -30,12 +31,27 @@ class BAESystemsScraper(JobScraper):
 
     def fetch_job_detail(self, job_id):
         url = f"https://jobs.baesystems.com/global/en/job/{job_id}/"
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
+        self.log("detail:fetch", url=url)
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            self.log(
+                "detail:http_error",
+                level="warning",
+                url=url,
+                status=status,
+                error=format_exc(),
+            )
+            return {}
         html = response.text
-        phapp_data = self.extract_phapp_ddo(html)
-        job_detail = phapp_data.get("jobDetail", {}).get("data", {}).get("job", {})
-        return job_detail
+        try:
+            phapp_data = self.extract_phapp_ddo(html)
+        except Exception:
+            self.log("detail:parse_error", level="warning", url=url, error=format_exc())
+            return {}
+        return phapp_data.get("jobDetail", {}).get("data", {}).get("job", {})
 
     def fetch_data(self):
         all_jobs = []
@@ -59,6 +75,7 @@ class BAESystemsScraper(JobScraper):
             response.raise_for_status()
             html = response.text
             phapp_data = self.extract_phapp_ddo(html)
+            self.log("list:page", offset=offset, requested=page_size)
 
             jobs = (
                 phapp_data.get("eagerLoadRefineSearch", {})
@@ -76,11 +93,15 @@ class BAESystemsScraper(JobScraper):
 
             offset += page_size
 
+        self.log("list:done", reason="end")
         return all_jobs
 
     def parse_job(self, job):
         job_id = job.get("jobId")
         detail = self.fetch_job_detail(job_id)
+
+        if not detail:
+            self.log("parse:errors_detail", n=1, reason="detail_empty", job_id=job_id)
 
         return {
             "Position Title": job.get("title"),
