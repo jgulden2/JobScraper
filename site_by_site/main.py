@@ -1,26 +1,172 @@
+"""
+Command-line entrypoint to run one or more job scrapers and export results.
+
+This module wires up:
+- Argument parsing (which scrapers to run, logging destination, suppression, testing).
+- Structured logging configuration with a 'scraper' attribute on each record.
+- A simple lifecycle per scraper: instantiate → set testing → run() → export().
+
+The registry of available scrapers is imported from `scrapers.SCRAPER_REGISTRY`.
+"""
+
+from __future__ import annotations
+
 import argparse
 import logging
+from pathlib import Path
+from typing import Mapping, Optional, Protocol, Sequence, Type
+
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
 
-def run_scraper(scraper_name, testing=False):
-    logging.getLogger(__name__).info("run:start", extra={"scraper": scraper_name})
-    scraper_class = SCRAPER_MAPPING.get(scraper_name)
+class ScraperProtocol(Protocol):
+    """
+    Protocol describing the minimal scraper interface expected by this CLI.
+
+    Implementations are constructed with no required arguments, expose a
+    `.testing` boolean attribute that influences fetch volume, and provide
+    a `run()` method to collect and parse jobs followed by an `export()`
+    method to save results to disk.
+    """
+
+    testing: bool
+
+    def run(self) -> None:
+        """Execute the scraper's fetch → parse → dedupe lifecycle."""
+
+    def export(self, filename: str) -> None:
+        """
+        Export the collected job records to a file.
+
+        Args:
+            filename: Destination path (e.g., 'scraped_data/{name}_jobs.csv').
+        """
+
+
+class ScraperField(logging.Filter):
+    """
+    Logging filter that guarantees a 'scraper' attribute on log records.
+
+    This lets the formatter include '%(scraper)s' safely even for log
+    messages emitted outside scraper adapters (e.g., third-party libs).
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:  # type: ignore[override]
+        """
+        Ensure a 'scraper' attribute exists on the record.
+
+        Args:
+            record: The log record to filter/enrich.
+
+        Returns:
+            True to allow the record to be handled.
+        """
+        if not hasattr(record, "scraper"):
+            record.scraper = ""
+        return True
+
+
+def configure_logging(logfile: Optional[str], suppress_console: bool) -> None:
+    """
+    Configure root logging with optional file/console handlers and a uniform format.
+
+    Args:
+        logfile: Path to a log file. If provided, logs are written here.
+        suppress_console: If True, do not attach a console (stdout) handler.
+
+    Returns:
+        None
+
+    Raises:
+        OSError: If the logfile cannot be opened/created by the FileHandler.
+        ValueError: If logging configuration fails due to invalid handler/formatter setup.
+    """
+    handlers: list[logging.Handler] = []
+    if logfile:
+        handlers.append(logging.FileHandler(logfile))
+    if not suppress_console and not logfile:
+        # If a log file is provided, we default to file-only to keep the console quiet.
+        handlers.append(logging.StreamHandler())
+    if not handlers:
+        handlers.append(logging.NullHandler())
+
+    fmt = "%(asctime)s [%(levelname)s] %(scraper)s %(message)s"
+    formatter = logging.Formatter(fmt)
+
+    root = logging.getLogger()
+    root.handlers = []
+    root.setLevel(logging.INFO)
+
+    filt = ScraperField()
+    for h in handlers:
+        h.setFormatter(formatter)
+        h.addFilter(filt)
+        root.addHandler(h)
+
+    # Quiet down verbose third-party libraries unless debugging.
+    logging.getLogger("undetected_chromedriver").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("selenium").setLevel(logging.WARNING)
+
+
+def run_scraper(
+    scraper_name: str,
+    testing: bool = False,
+    registry: Mapping[str, Type[ScraperProtocol]] = SCRAPER_MAPPING,
+) -> None:
+    """
+    Run a single scraper end-to-end and export its results.
+
+    Args:
+        scraper_name: Key in the scraper registry indicating which scraper to run.
+        testing: If True, scrapers should run in reduced-scope mode (few jobs).
+        registry: Mapping of scraper names to scraper classes.
+
+    Returns:
+        None
+
+    Raises:
+        KeyError: If the scraper name is not present in the registry.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("run:start", extra={"scraper": scraper_name})
+
+    scraper_class = registry.get(scraper_name)
     if not scraper_class:
+        # Keep user-visible feedback while remaining silent in logs when suppressed.
         print(f"Unknown scraper: {scraper_name}")
+        logger.info("run:finish", extra={"scraper": scraper_name})
         return
 
     print(f"Running {scraper_name} scraper... (testing={testing})")
-    scraper = scraper_class()
+    scraper: ScraperProtocol = scraper_class()
     scraper.testing = testing
 
+    # Ensure export destination exists.
+    out_dir = Path("scraped_data")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     scraper.run()
-    scraper.export(f"scraped_data/{scraper_name}_jobs.csv")
+    scraper.export(str(out_dir / f"{scraper_name}_jobs.csv"))
+
     print(f"Finished {scraper_name}.\n")
-    logging.getLogger(__name__).info("run:finish", extra={"scraper": scraper_name})
+    logger.info("run:finish", extra={"scraper": scraper_name})
 
 
-if __name__ == "__main__":
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """
+    Parse CLI arguments.
+
+    Args:
+        argv: Optional sequence of raw CLI tokens. If None, uses sys.argv.
+
+    Returns:
+        Parsed arguments namespace with attributes:
+            - scrapers: Optional list of scraper names to run (defaults to all).
+            - logfile: Optional path to write structured logs.
+            - suppress: Whether to suppress console logging.
+            - testing: Whether to run in testing mode (reduced job count).
+    """
     parser = argparse.ArgumentParser(description="Run one or more job scrapers.")
     parser.add_argument(
         "--scrapers",
@@ -45,37 +191,29 @@ if __name__ == "__main__":
         default=False,
         help="Run in testing mode with a small sample of jobs.",
     )
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
 
-    log_handlers = []
-    if args.logfile:
-        log_handlers.append(logging.FileHandler(args.logfile))
-    if not args.suppress and not args.logfile:
-        log_handlers.append(logging.StreamHandler())
-    if not log_handlers:
-        log_handlers.append(logging.NullHandler())
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """
+    Program entrypoint: configure logging, parse args, and run selected scrapers.
 
-    class ScraperField(logging.Filter):
-        def filter(self, record):
-            if not hasattr(record, "scraper"):
-                record.scraper = ""
-            return True
+    Args:
+        argv: Optional sequence of raw CLI tokens. If None, uses sys.argv.
 
-    fmt = "%(asctime)s [%(levelname)s] %(scraper)s %(message)s"
-    formatter = logging.Formatter(fmt)
+    Returns:
+        Process exit code (0 on success).
+    """
+    args = parse_args(argv)
+    configure_logging(args.logfile, args.suppress)
 
-    root = logging.getLogger()
-    root.handlers = []
-    root.setLevel(logging.INFO)
-    for h in log_handlers:
-        h.setFormatter(formatter)
-        h.addFilter(ScraperField())
-        root.addHandler(h)
-
-    logging.getLogger("undetected_chromedriver").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("selenium").setLevel(logging.WARNING)
-
-    for scraper_name in args.scrapers or SCRAPER_MAPPING.keys():
+    # Run selected scrapers (or all if none specified).
+    to_run = args.scrapers or SCRAPER_MAPPING.keys()
+    for scraper_name in to_run:
         run_scraper(scraper_name, testing=args.testing)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

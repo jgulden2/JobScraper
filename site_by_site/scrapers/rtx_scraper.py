@@ -1,19 +1,33 @@
+"""
+Raytheon Technologies (RTX) scraper.
+
+Uses Selenium (undetected-chromedriver) to load dynamic content from
+careers.rtx.com, extract the `phApp.ddo` data object for listings,
+and then fetch detailed job information via requests.
+"""
+
+from __future__ import annotations
+
 import json
-import time
-import re
 import os
+import re
+import time
 import requests
 import undetected_chromedriver as uc
-from scrapers.base import JobScraper
 from selenium.webdriver.support.ui import WebDriverWait
 from traceback import format_exc
+from typing import Any, Dict, List, Optional, Tuple
+
+from scrapers.base import JobScraper
 
 
-# Silence UC's noisy destructor on Windows (enabled by default; set env var to 0 to disable)
+# -------------------------------------------------------------------------
+# Suppress noisy undetected_chromedriver destructor logs on Windows
+# -------------------------------------------------------------------------
 if os.name == "nt" and os.environ.get("RTX_SILENCE_UC_DEL", "1") == "1":
     try:
 
-        def noop(self):
+        def noop(self) -> None:
             return None
 
         uc.Chrome.__del__ = noop
@@ -22,7 +36,29 @@ if os.name == "nt" and os.environ.get("RTX_SILENCE_UC_DEL", "1") == "1":
 
 
 class RTXScraper(JobScraper):
-    def __init__(self):
+    """
+    Scraper for Raytheon Technologies (RTX) job listings.
+
+    Workflow:
+      1) Load search-results pages with undetected_chromedriver (UC) to capture
+         dynamically populated job data from the global `phApp.ddo` variable.
+      2) Extract job listings from the `eagerLoadRefineSearch` JSON.
+      3) For each job, optionally fetch job detail pages for enrichment.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the RTX scraper with base URL, headers, and Selenium templates.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         super().__init__(
             base_url="https://careers.rtx.com/global/en/search-results",
             headers={
@@ -39,23 +75,72 @@ class RTXScraper(JobScraper):
         self.page_size = 10
         self.suppress_console = False
 
-    def raw_id(self, raw_job):
+    # -------------------------------------------------------------------------
+    # Identity
+    # -------------------------------------------------------------------------
+    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
+        """
+        Return the job ID for de-duplication.
+
+        Args:
+            raw_job: Raw job dictionary from `phApp.ddo`.
+
+        Returns:
+            The job's 'jobId' string, or None if unavailable.
+        """
         return raw_job.get("jobId")
 
-    def extract_phapp_ddo(self, html):
+    # -------------------------------------------------------------------------
+    # Data extraction utilities
+    # -------------------------------------------------------------------------
+    def extract_phapp_ddo(self, html: str) -> Dict[str, Any]:
+        """
+        Extract and decode the global `phApp.ddo` object embedded in HTML.
+
+        Args:
+            html: The HTML string containing a script assignment to `phApp.ddo`.
+
+        Returns:
+            Parsed Python dictionary representing the `phApp.ddo` JSON.
+
+        Raises:
+            ValueError: If the `phApp.ddo` object cannot be found in the HTML.
+            json.JSONDecodeError: If the JSON payload cannot be parsed.
+        """
         pattern = re.compile(r"phApp\.ddo\s*=\s*(\{.*?\});", re.DOTALL)
         match = pattern.search(html)
         if not match:
             raise ValueError("phApp.ddo object not found in HTML")
         return json.loads(match.group(1))
 
-    def extract_total_results(self, phapp_data):
+    def extract_total_results(self, phapp_data: Dict[str, Any]) -> int:
+        """
+        Extract the total job count from the phApp.ddo structure.
+
+        Args:
+            phapp_data: The parsed JSON data from phApp.ddo.
+
+        Returns:
+            Integer total number of job results.
+        """
         return int(phapp_data.get("eagerLoadRefineSearch", {}).get("totalHits", 0))
 
-    def fetch_data(self):
-        job_limit = 15 if getattr(self, "testing", False) else float("inf")
+    # -------------------------------------------------------------------------
+    # Fetch listings
+    # -------------------------------------------------------------------------
+    def fetch_data(self) -> List[Dict[str, Any]]:
+        """
+        Retrieve all job listings from RTX Careers search-results.
 
-        all_jobs = []
+        Returns:
+            A list of job listing dictionaries from `phApp.ddo['jobs']`.
+
+        Raises:
+            requests.RequestException: If network communication fails.
+            ValueError: If the `phApp.ddo` data cannot be found or parsed.
+        """
+        job_limit = 15 if getattr(self, "testing", False) else float("inf")
+        all_jobs: List[Dict[str, Any]] = []
         offset = 0
 
         options = uc.ChromeOptions()
@@ -66,23 +151,21 @@ class RTXScraper(JobScraper):
         driver = uc.Chrome(options=options)
 
         try:
-            # First page
             first_page_url = "https://careers.rtx.com/global/en/search-results"
             driver.get(first_page_url)
 
             self.log("driver:wait", target="phApp.ddo")
-
-            # Wait until phApp.ddo is present in the page's JS context
             WebDriverWait(driver, 30).until(
                 lambda d: d.execute_script("return window.phApp && window.phApp.ddo;")
             )
-            phapp_data = driver.execute_script("return window.phApp.ddo;")
+            phapp_data: Dict[str, Any] = driver.execute_script(
+                "return window.phApp.ddo;"
+            )
 
             total_results = self.extract_total_results(phapp_data)
-
             self.log("source:total", total=total_results)
 
-            jobs = (
+            jobs: List[dict[str, Any]] = (
                 phapp_data.get("eagerLoadRefineSearch", {})
                 .get("data", {})
                 .get("jobs", [])
@@ -97,7 +180,6 @@ class RTXScraper(JobScraper):
                 return all_jobs
 
             self.log("list:fetched", count=len(jobs), offset=0)
-
             offset += self.page_size
 
             while offset < total_results:
@@ -113,7 +195,6 @@ class RTXScraper(JobScraper):
                     .get("data", {})
                     .get("jobs", [])
                 )
-
                 if not jobs:
                     self.log("list:done", reason="empty")
                     break
@@ -124,7 +205,6 @@ class RTXScraper(JobScraper):
                     all_jobs.append(job)
 
                 self.log("list:fetched", count=len(jobs), offset=offset)
-
                 offset += self.page_size
                 time.sleep(1)
 
@@ -135,9 +215,26 @@ class RTXScraper(JobScraper):
         self.log("list:done", reason="end")
         return all_jobs
 
-    def fetch_job_detail(self, job_id):
+    # -------------------------------------------------------------------------
+    # Fetch details
+    # -------------------------------------------------------------------------
+    def fetch_job_detail(self, job_id: str) -> Dict[str, Any]:
+        """
+        Fetch the detailed JSON for a given job posting.
+
+        Args:
+            job_id: The job identifier string.
+
+        Returns:
+            Parsed job detail data dictionary (may be empty if unavailable).
+
+        Raises:
+            requests.RequestException: If the detail page cannot be retrieved.
+            ValueError: If the phApp.ddo object cannot be found or parsed.
+        """
         url = self.job_detail_url_template.format(job_id=job_id)
         self.log("detail:fetch", url=url)
+
         try:
             response = requests.get(url, headers=self.headers)
             response.raise_for_status()
@@ -151,15 +248,29 @@ class RTXScraper(JobScraper):
                 error=format_exc(),
             )
             return {}
+
         html = response.text
         try:
             phapp_data = self.extract_phapp_ddo(html)
         except Exception:
             self.log("detail:parse_error", level="warning", url=url, error=format_exc())
             return {}
+
         return phapp_data.get("jobDetail", {}).get("data", {}).get("job", {})
 
-    def extract_salary_range(self, text):
+    # -------------------------------------------------------------------------
+    # Parsing helpers
+    # -------------------------------------------------------------------------
+    def extract_salary_range(self, text: str) -> Tuple[str, str]:
+        """
+        Extract a USD salary range from plain text.
+
+        Args:
+            text: Text to search for a pattern like '#### USD - #### USD'.
+
+        Returns:
+            A (min, max) tuple of numeric strings, or ("", "") if not found.
+        """
         match = re.search(r"([\d,]+)\s*USD\s*-\s*([\d,]+)\s*USD", text)
         if match:
             min_salary = match.group(1).replace(",", "")
@@ -167,7 +278,21 @@ class RTXScraper(JobScraper):
             return min_salary, max_salary
         return "", ""
 
-    def extract_section(self, text, start_markers, end_markers):
+    def extract_section(
+        self, text: str, start_markers: List[str], end_markers: List[str]
+    ) -> str:
+        """
+        Extract a section of text bounded by specific start and end markers.
+
+        Args:
+            text: The full text from which to extract.
+            start_markers: List of possible starting phrases.
+            end_markers: List of possible ending phrases.
+
+        Returns:
+            The text content between markers, stripped of colons and whitespace,
+            or an empty string if no section is found.
+        """
         for start_marker in start_markers:
             start_idx = text.find(start_marker)
             if start_idx != -1:
@@ -181,11 +306,27 @@ class RTXScraper(JobScraper):
                 return section.lstrip(": ").strip()
         return ""
 
-    def parse_job(self, raw_job):
+    # -------------------------------------------------------------------------
+    # Parse job
+    # -------------------------------------------------------------------------
+    def parse_job(self, raw_job: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert a raw job listing into a normalized structured record.
+
+        Args:
+            raw_job: One raw job dict as produced by `fetch_data()`.
+
+        Returns:
+            A normalized job dictionary containing:
+              - Core metadata (title, location, posting ID)
+              - Job description and qualification sections
+              - Salary, clearance, relocation, and citizenship fields
+        """
         job_id = raw_job.get("jobId")
         detail = self.fetch_job_detail(job_id)
         if not detail:
             self.log("parse:errors_detail", n=1, reason="detail_empty", job_id=job_id)
+
         description_html = detail.get("description", "")
         clean_desc = self.clean_html(description_html)
 
@@ -193,6 +334,7 @@ class RTXScraper(JobScraper):
             "Yes" if "U.S. citizenship is required" in clean_desc else "No"
         )
         salary_min, salary_max = self.extract_salary_range(clean_desc)
+
         required_skills = self.extract_section(
             clean_desc,
             start_markers=[
