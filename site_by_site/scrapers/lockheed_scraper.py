@@ -13,7 +13,6 @@ import re
 from time import sleep
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import requests
 from bs4 import BeautifulSoup as BS
 
 from scrapers.base import JobScraper
@@ -139,7 +138,7 @@ class LockheedMartinScraper(JobScraper):
             requests.RequestException: If the search page cannot be fetched.
             ValueError: If the 'data-total-pages' attribute is non-numeric.
         """
-        response = requests.get(self.SEARCH_URL, headers=self.headers)
+        response = self.get(self.SEARCH_URL)
         response.raise_for_status()
         soup = BS(response.text, "html.parser")
         pagination = soup.select_one("section#search-results")
@@ -165,7 +164,7 @@ class LockheedMartinScraper(JobScraper):
             requests.RequestException: If the page cannot be fetched.
         """
         page_url = f"{self.SEARCH_URL}?p={page_num}"
-        response = requests.get(page_url, headers=self.headers)
+        response = self.get(page_url)
         response.raise_for_status()
 
         soup = BS(response.text, "html.parser")
@@ -207,7 +206,7 @@ class LockheedMartinScraper(JobScraper):
                 as 'detail:jsonld_error' and parsing continues.
         """
         self.log("detail:fetch", url=url)
-        response = requests.get(url, headers=self.headers)
+        response = self.get(url)
         response.raise_for_status()
         soup = BS(response.text, "html.parser")
 

@@ -108,7 +108,7 @@ class BAESystemsScraper(JobScraper):
         url = f"https://jobs.baesystems.com/global/en/job/{job_id}/"
         self.log("detail:fetch", url=url)
         try:
-            response = requests.get(url, headers=self.headers)
+            response = self.get(url)
             response.raise_for_status()
         except requests.RequestException as e:
             status = getattr(getattr(e, "response", None), "status_code", None)
@@ -149,7 +149,7 @@ class BAESystemsScraper(JobScraper):
         job_limit = 15 if getattr(self, "testing", False) else float("inf")  # type: ignore[assignment]
 
         first_page_url = f"{self.base_url}?from={offset}&s=1"
-        response = requests.get(first_page_url, headers=self.headers)
+        response = self.get(first_page_url)
         response.raise_for_status()
         html = response.text
         phapp_data = self.extract_phapp_ddo(html)
@@ -159,7 +159,7 @@ class BAESystemsScraper(JobScraper):
 
         while offset < total_results and len(all_jobs) < job_limit:
             page_url = f"{self.base_url}?from={offset}&s=1"
-            response = requests.get(page_url, headers=self.headers)
+            response = self.get(page_url)
             response.raise_for_status()
             html = response.text
             phapp_data = self.extract_phapp_ddo(html)

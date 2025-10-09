@@ -15,11 +15,14 @@ Typical usage (via the CLI):
 from __future__ import annotations
 
 import logging
+import requests
 from time import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as BS
 
 
 class JobScraper:
@@ -72,6 +75,10 @@ class JobScraper:
             {"scraper": self.__class__.__name__.replace("Scraper", "").lower()},
         )
         self.log_every = 25
+        # Default per-request timeout (seconds) if caller doesn't supply one
+        self.default_timeout = 30.0
+        # Shared requests.Session with retry/backoff enabled
+        self.session = self.build_session_with_retries()
 
     def fmt_pairs(self, **kv: Any) -> str:
         """
@@ -174,9 +181,7 @@ class JobScraper:
         """
         if not raw_html:
             return ""
-        return BeautifulSoup(raw_html, "html.parser").get_text(
-            separator=" ", strip=True
-        )
+        return BS(raw_html, "html.parser").get_text(separator=" ", strip=True)
 
     def dedupe_raw(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -224,6 +229,155 @@ class JobScraper:
             seen.add(k)
             out.append(r)
         return out
+
+    # -----------------------------
+    # HTTP session with retries/backoff
+    # -----------------------------
+    def build_session_with_retries(
+        self,
+        total: int = 3,
+        backoff_factor: float = 0.5,
+        status_forcelist: tuple[int, ...] = (429, 500, 502, 503, 504),
+        allowed_methods: frozenset[str] = frozenset({"GET", "POST"}),
+    ) -> requests.Session:
+        """
+        Create and return a `requests.Session` configured with retry/backoff.
+
+        The session retries idempotent (and optionally POST) requests on transient
+        network failures and specific HTTP status codes using exponential backoff.
+        `Retry-After` headers are respected when present.
+
+        Args:
+            total: Maximum retry attempts for connect/read/status errors. Applies
+                individually to each error category.
+            backoff_factor: Multiplier for exponential backoff delays. Sleep is
+                computed as: {backoff_factor} * (2 ** (retry_number - 1)), capped
+                by urllib3's internal policies.
+            status_forcelist: HTTP status codes that should trigger a retry.
+                Typically includes 429 and 5xx.
+            allowed_methods: HTTP methods that are eligible for retries.
+                By default includes 'GET' and 'POST'. Use a frozenset for safety.
+
+        Returns:
+            A `requests.Session` with retry-enabled `HTTPAdapter`s mounted for both
+            HTTP and HTTPS, and initialized with `self.headers`.
+
+        Raises:
+            Exception: Any unexpected error raised while constructing the session
+                or mounting adapters (rare; surfaced for visibility).
+        """
+        s = requests.Session()
+        s.headers.update(self.headers or {})
+        retry = Retry(
+            total=total,
+            connect=total,
+            read=total,
+            status=total,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
+            allowed_methods=allowed_methods,
+            raise_on_status=False,
+            respect_retry_after_header=True,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        return s
+
+    def enable_retries(self, session: requests.Session) -> None:
+        """
+        Attach the standard retry/backoff policy to an existing `requests.Session`.
+
+        Use this when a scraper constructs its own session (e.g., to manage cookies
+        or referers) but still wants the shared retry behavior.
+
+        Args:
+            session: The session to modify. Adapters for HTTP/HTTPS are replaced
+                with versions configured for retries.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Any unexpected error raised while mounting the adapters.
+        """
+        retry = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            status=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "POST"}),
+            raise_on_status=False,
+            respect_retry_after_header=True,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+    def request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
+        """
+        Issue an HTTP request via the scraper's retry-enabled session.
+
+        This wrapper injects default headers/params from the scraper and applies a
+        per-request timeout when one is not provided.
+
+        Args:
+            method: HTTP method (e.g., 'GET', 'POST', 'HEAD').
+            url: Absolute or relative URL to request.
+            **kwargs: Passed through to `Session.request`. Common options include:
+                - headers (dict[str, str]): Per-request headers to merge with defaults.
+                - params (dict[str, Any]): Query params to merge with defaults.
+                - data/json/files: Request body payloads.
+                - timeout (float | tuple[float, float]): Per-request timeout in seconds.
+
+        Returns:
+            The `requests.Response` object returned by the underlying session.
+
+        Raises:
+            requests.exceptions.Timeout: If the request exceeds the timeout.
+            requests.exceptions.ConnectionError: On DNS/TCP failures.
+            requests.exceptions.HTTPError: If `raise_for_status()` is called by
+                the caller and the response indicates an error.
+            requests.exceptions.RequestException: For any other request issue.
+        """
+        headers = kwargs.pop("headers", None)
+        params = kwargs.pop("params", None)
+        timeout = kwargs.pop("timeout", self.default_timeout)
+
+        # Merge base headers/params with per-call ones
+        merged_headers = {**(self.headers or {}), **(headers or {})}
+        merged_params = {**(self.params or {}), **(params or {})}
+
+        resp = self.session.request(
+            method=method,
+            url=url,
+            headers=merged_headers,
+            params=merged_params,
+            timeout=timeout,
+            **kwargs,
+        )
+        return resp
+
+    def get(self, url: str, **kwargs: Any) -> requests.Response:
+        """
+        Convenience wrapper for HTTP GET using the retry-enabled session.
+
+        Args:
+            url: Absolute or relative URL to request.
+            **kwargs: Passed through to `request` (e.g., headers, params, timeout).
+
+        Returns:
+            The `requests.Response` from the GET request.
+
+        Raises:
+            requests.exceptions.Timeout
+            requests.exceptions.ConnectionError
+            requests.exceptions.RequestException
+                (See `request` for detailed failure modes.)
+        """
+        return self.request("GET", url, **kwargs)
 
     # -----------------------------
     # Orchestrator

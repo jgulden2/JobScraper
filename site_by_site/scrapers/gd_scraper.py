@@ -67,6 +67,7 @@ class GeneralDynamicsScraper(JobScraper):
         self.testing = getattr(self, "testing", False)
 
         self.session = requests.Session()
+        self.enable_retries(self.session)
         self.session.headers.update(
             {
                 "User-Agent": self.headers.get("User-Agent", "Mozilla/5.0"),

@@ -236,7 +236,7 @@ class RTXScraper(JobScraper):
         self.log("detail:fetch", url=url)
 
         try:
-            response = requests.get(url, headers=self.headers)
+            response = self.get(url)
             response.raise_for_status()
         except requests.RequestException as e:
             status = getattr(getattr(e, "response", None), "status_code", None)
