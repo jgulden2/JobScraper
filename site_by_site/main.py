@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
-from typing import Mapping, Optional, Protocol, Sequence, Type
+import pandas as pd
 
+from pathlib import Path
+from time import time
+from utils.geocode import geocode_unique
+from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
 
@@ -41,6 +44,8 @@ class ScraperProtocol(Protocol):
         Args:
             filename: Destination path (e.g., 'scraped_data/{name}_jobs.csv').
         """
+
+    jobs_full: List[Dict]
 
 
 class ScraperField(logging.Filter):
@@ -113,7 +118,7 @@ def run_scraper(
     scraper_name: str,
     testing: bool = False,
     registry: Mapping[str, Type[ScraperProtocol]] = SCRAPER_MAPPING,
-) -> None:
+) -> ScraperProtocol | None:
     """
     Run a single scraper end-to-end and export its results.
 
@@ -151,6 +156,7 @@ def run_scraper(
 
     print(f"Finished {scraper_name}.\n")
     logger.info("run:finish", extra={"scraper": scraper_name})
+    return scraper
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -177,8 +183,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--logfile",
         type=str,
-        default=None,
-        help="Optional path to log file.",
+        default="run.log",
+        help="Path to log file (defrault: run.log).",
     )
     parser.add_argument(
         "--suppress",
@@ -190,6 +196,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=lambda x: str(x).lower() == "true",
         default=False,
         help="Run in testing mode with a small sample of jobs.",
+    )
+    parser.add_argument(
+        "--combine-full",
+        nargs="?",
+        const="scraped_data/all_full.csv",
+        default=None,
+        metavar="OUT_CSV",
+        help=(
+            "After running all selected scrapers, write one combined FULL canonical CSV to this path. "
+            "If used without a value, defaults to scraped_data/all_full.csv."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -207,10 +224,72 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
 
-    # Run selected scrapers (or all if none specified).
-    to_run = args.scrapers or SCRAPER_MAPPING.keys()
+    # Run selected scrapers (or all if none specified) and keep handles.
+    to_run = list(args.scrapers or SCRAPER_MAPPING.keys())
+    ran: list[ScraperProtocol] = []
     for scraper_name in to_run:
-        run_scraper(scraper_name, testing=args.testing)
+        s = run_scraper(scraper_name, testing=args.testing)
+        if s is not None:
+            ran.append(s)
+
+    # Optionally write one combined FULL canonical CSV across all scrapers.
+    if args.combine_full:
+        rows: list[dict] = []
+        for s in ran:
+            jf = getattr(s, "jobs_full", None)
+            if isinstance(jf, list) and jf:
+                rows.extend(jf)
+
+        if rows:
+            # gather all existing Location strings (non-empty)
+            loc_strings = [r.get("Location", "") for r in rows if r.get("Location")]
+            logger = logging.getLogger(__name__)
+            n_rows = len(rows)
+            n_loc = len(loc_strings)
+            uniq = sorted(set(loc_strings))
+            logger.info(
+                f"geocode:rows:start rows={n_rows} locations={n_loc} unique={len(uniq)}"
+            )
+            start = time()
+            lookup = geocode_unique(
+                loc_strings,
+                cache_path=".cache/geocode.sqlite",
+                user_agent="jobscraper-geocoder",
+                rate_limit_s=1.1,
+            )
+            # augment each row if we have a hit
+            introduced_cols = (
+                set().union(*[set(rec.keys()) for rec in lookup.values()])
+                if lookup
+                else set()
+            )
+            matched = 0
+            for r in rows:
+                q = r.get("Location", "")
+                rec = lookup.get(q)
+                if not rec:
+                    continue
+                for k, v in rec.items():
+                    r[k] = v
+                matched += 1
+            new_geo_cols = len([c for c in introduced_cols if c.startswith("Geo ")])
+            logger.info(
+                f"geocode:rows:finish matched_rows={matched} unique_lookups={len(lookup)} new_geo_cols={new_geo_cols} time={round(time() - start)} s"
+            )
+
+        if rows:
+            out_path = Path(args.combine_full)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(rows).to_csv(out_path, index=False)
+            logging.getLogger(__name__).info(
+                "export:combined_full",
+                extra={"scraper": "", "path": str(out_path), "n": len(rows)},
+            )
+        else:
+            logging.getLogger(__name__).info(
+                "export:combined_full:empty",
+                extra={"scraper": "", "reason": "no_full_rows"},
+            )
 
     return 0
 

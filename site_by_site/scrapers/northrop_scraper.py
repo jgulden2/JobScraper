@@ -10,16 +10,12 @@ Logging follows the standardized `self.log("event", key=value, ...)` style.
 
 from __future__ import annotations
 
-import html
-import json
-import re
-from typing import Any, Dict, List, Optional
-
 import requests
-from bs4 import BeautifulSoup as BS
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from typing import Any, Dict, List, Optional
 from scrapers.base import JobScraper
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from utils.detail_fetchers import fetch_detail_artifacts
 
 
 class NorthropGrummanScraper(JobScraper):
@@ -169,69 +165,6 @@ class NorthropGrummanScraper(JobScraper):
         return jobs
 
     # -------------------------------------------------------------------------
-    # Flatten / page embed parsing
-    # -------------------------------------------------------------------------
-    def flatten(
-        self, obj: Any, prefix: str = "", out: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Flatten nested dicts/lists into dotted keys.
-
-        Args:
-            obj: Object to flatten (dict, list, or scalar).
-            prefix: Key path prefix to apply to nested values.
-            out: Destination mapping (created if None).
-
-        Returns:
-            The `out` mapping with flattened keys and scalar values.
-
-        Raises:
-            None
-        """
-        if out is None:
-            out = {}
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                self.flatten(v, f"{prefix}{k}." if prefix else f"{k}.", out)
-        elif isinstance(obj, list):
-            if all(isinstance(x, (str, int, float, bool)) or x is None for x in obj):
-                out[prefix[:-1]] = "; ".join("" if x is None else str(x) for x in obj)
-            else:
-                for i, v in enumerate(obj):
-                    self.flatten(v, f"{prefix}{i}.", out)
-        else:
-            out[prefix[:-1]] = "" if obj is None else obj
-        return out
-
-    def parse_page_embed(self, html_text: str) -> Dict[str, Any]:
-        """
-        Parse embedded JSON from the HTML detail page (when API detail is unavailable).
-
-        Args:
-            html_text: Raw HTML of a job detail page.
-
-        Returns:
-            Flattened mapping of embedded JSON fields. If a `positions` list is
-            present, the first element is also flattened under `positions.0.*`.
-
-        Raises:
-            json.JSONDecodeError: If the embedded JSON block cannot be decoded.
-            ValueError: If the expected container is present but contains invalid JSON.
-        """
-        soup = BS(html_text, "html.parser")
-        code = soup.select_one("#smartApplyData")
-        if not code:
-            return {}
-        raw = html.unescape(code.text)
-        data = json.loads(raw)
-        flat = self.flatten(data)
-        if isinstance(data.get("positions"), list) and data["positions"]:
-            pos = self.flatten(data["positions"][0])
-            for k, v in pos.items():
-                flat[f"positions.0.{k}"] = v
-        return flat
-
-    # -------------------------------------------------------------------------
     # Parsing a single job
     # -------------------------------------------------------------------------
     def parse_job(self, raw_job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -256,12 +189,12 @@ class NorthropGrummanScraper(JobScraper):
             self.log("parse:skip", reason="no_pid")
             return None
 
+        # Minimal identity fields: canonicalizer will populate the rest
         base = {
-            "Position Title": raw_job.get("title", ""),
-            "Location": raw_job.get("location", ""),
-            "Job Category": raw_job.get("category", ""),
-            "Posting ID": raw_job.get("ats_job_id") or raw_job.get("pid"),
-            "Detail URL": raw_job.get("detail_url", ""),
+            "title": raw_job.get("title", ""),
+            "location": raw_job.get("location", ""),
+            "posting_id": raw_job.get("ats_job_id") or raw_job.get("pid"),
+            "detail_url": raw_job.get("detail_url", ""),
         }
 
         # --- Preferred path: detail API
@@ -269,28 +202,13 @@ class NorthropGrummanScraper(JobScraper):
         jr = self.session.get(
             f"{self.API_URL}/{pid}", params={"domain": "ngc.com"}, timeout=30
         )
+
         if jr.status_code == 200:
             j = jr.json()
-            flat = self.flatten(j)
-            desc = j.get("job_description") or j.get("description") or ""
-            quals = j.get("qualifications") or ""
-            pref = j.get("preferred_qualifications") or ""
-            rec = {
+            return {
                 **base,
-                "Job Description": self.clean_html(desc),
-                "Required Skills": self.clean_html(quals),
-                "Preferred Skills": self.clean_html(pref),
+                "artifacts": {"_vendor_blob": j},
             }
-            txt = f"{desc} {quals} {pref}".lower()
-            rec["US Person Required"] = (
-                "Yes" if ("us citizen" in txt or "u.s. citizen" in txt) else "No"
-            )
-            rec["Clearance Needed"] = self.extract_clearance(BS(desc, "html.parser"))
-            rec["Clearance Obtainable"] = rec["Clearance Needed"]
-            for k, v in flat.items():
-                if k not in rec:
-                    rec[f"json.{k}"] = v
-            return rec
 
         if jr.status_code in (404, 405, 410):
             self.log("detail:http_status", kind="api", status=jr.status_code, pid=pid)
@@ -308,51 +226,9 @@ class NorthropGrummanScraper(JobScraper):
             (u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment)
         )
 
-        self.log("detail:fetch", kind="html", url=url, pid=pid)
-        r = self.session.get(url, timeout=30)
-        if r.status_code != 200:
-            self.log("detail:http_status", kind="html", status=r.status_code, pid=pid)
-            return base
-
-        flat_page = self.parse_page_embed(r.text)
-        desc = (
-            flat_page.get("positions.0.job_description")
-            or flat_page.get("job_description")
-            or flat_page.get("description")
-            or ""
-        )
-        rec = {
+        artifacts = fetch_detail_artifacts(self.session.get, self.log, url)
+        return {
             **base,
-            "Job Description": self.clean_html(desc),
+            "detail_url": artifacts.get("_canonical_url") or url,
+            "artifacts": artifacts,
         }
-        txt = desc.lower()
-        rec["US Person Required"] = (
-            "Yes" if ("us citizen" in txt or "u.s. citizen" in txt) else "No"
-        )
-
-        rec["Clearance Needed"] = self.extract_clearance(BS(desc, "html.parser"))
-        rec["Clearance Obtainable"] = rec["Clearance Needed"]
-        for k, v in flat_page.items():
-            if k not in rec:
-                rec[f"page.{k}"] = v
-        return rec
-
-    # -------------------------------------------------------------------------
-    # Helpers
-    # -------------------------------------------------------------------------
-    def extract_clearance(self, soup: BS) -> str:
-        """
-        Extract a clearance keyword from a soup fragment.
-
-        Args:
-            soup: BeautifulSoup fragment of the job description/qualifications.
-
-        Returns:
-            One of: 'Secret', 'Top Secret', 'Ts/Sci', 'Public Trust', or ''.
-
-        Raises:
-            None
-        """
-        text = soup.get_text().lower()
-        match = re.search(r"(secret|top secret|ts/sci|public trust)", text)
-        return match.group(0).title() if match else ""

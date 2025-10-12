@@ -13,18 +13,18 @@ field injected by the base class' LoggerAdapter.
 
 from __future__ import annotations
 
-import base64
-import json
-import re
 from time import time
 from math import ceil
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlencode, urljoin, urlunparse
+from urllib.parse import urlencode, urlunparse, urljoin
 
 import requests
 from bs4 import BeautifulSoup as BS
 
 from scrapers.base import JobScraper
+from utils.http import b64url_encode
+from utils.extractors import extract_insets, extract_bold_block
+from utils.detail_fetchers import fetch_detail_artifacts
 from traceback import format_exc
 
 
@@ -80,7 +80,7 @@ class GeneralDynamicsScraper(JobScraper):
         self.session.get(self.JOB_SEARCH_URL, timeout=30)
 
     # -------------------------------------------------------------------------
-    # Identity / URL helpers
+    # Identity
     # -------------------------------------------------------------------------
     def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
         """
@@ -97,308 +97,9 @@ class GeneralDynamicsScraper(JobScraper):
         """
         return raw_job.get("id")
 
-    def b64url_decode(self, s: str) -> str:
-        """
-        Decode a base64url string to UTF-8 text (with missing padding tolerated).
-
-        Args:
-            s: Base64url text (padding optional).
-
-        Returns:
-            Decoded UTF-8 string.
-
-        Raises:
-            binascii.Error: If the input contains invalid base64url characters.
-            UnicodeDecodeError: If the decoded bytes are not valid UTF-8.
-        """
-        s += "=" * (-len(s) % 4)
-        return base64.urlsafe_b64decode(s.encode("utf-8")).decode("utf-8")
-
-    def b64url_encode(self, obj: str) -> str:
-        """
-        Encode a Python object to compact JSON, then base64url without padding.
-
-        Args:
-            obj: JSON-serializable object.
-
-        Returns:
-            Base64url-encoded string with trailing '=' padding removed.
-
-        Raises:
-            TypeError: If `obj` is not JSON-serializable.
-        """
-        raw = json.dumps(obj, separators=(",", ":")).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
-
-    def absolute_url(self, href: Optional[str]) -> str:
-        """
-        Convert a relative link to an absolute URL on the gd.com domain.
-
-        Args:
-            href: Relative or absolute link (may be None or empty).
-
-        Returns:
-            Absolute URL as a string. Empty input becomes the site root.
-
-        Raises:
-            None
-        """
-        return urljoin("https://www.gd.com", href or "")
-
-    # -------------------------------------------------------------------------
-    # HTML utilities
-    # -------------------------------------------------------------------------
-    def text(self, node: Any) -> str:
-        """
-        Extract plain text from HTML, collapsing whitespace.
-
-        Args:
-            node: HTML node or markup snippet.
-
-        Returns:
-            Plain text content with spaces normalized.
-
-        Raises:
-            None
-        """
-        return BS(str(node), "html.parser").get_text(" ", strip=True)
-
-    def flatten(self, prefix: str, obj: Any, out: Dict[str, Any]) -> None:
-        """
-        Flatten nested dicts/lists into dotted keys in-place.
-
-        Args:
-            prefix: Current key path ('' for root).
-            obj: The value at the current path (dict, list, or scalar).
-            out: Destination dictionary populated with flattened keys.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                self.flatten(f"{prefix}.{k}" if prefix else k, v, out)
-        elif isinstance(obj, list):
-            for i, v in enumerate(obj):
-                self.flatten(f"{prefix}[{i}]", v, out)
-        else:
-            out[prefix] = obj
-
-    def collect_until_next_b(self, start_b: Any) -> str:
-        """
-        Collect text and list items that follow a <b> label until the next <b>.
-
-        Handles sequences like:
-            <b>Location:</b> USA AL Huntsville<br>...
-            <b>Job Duties and Responsibilities</b><ul><li>...</li></ul>
-
-        Args:
-            start_b: A BeautifulSoup node pointing to a <b> element.
-
-        Returns:
-            A single string with line breaks preserved for list items.
-
-        Raises:
-            None
-        """
-        parts: List[str] = []
-        list_items: Optional[List[str]] = None
-        for sib in start_b.next_siblings:
-            # Stop when we hit the next <b> label
-            if getattr(sib, "name", None) == "b":
-                break
-            # Collect lists as arrays
-            if getattr(sib, "name", None) == "ul":
-                items: List[str] = []
-                for li in sib.find_all("li"):
-                    items.append(self.text(li))
-                list_items = (list_items or []) + items
-                continue
-            # Everything else as text (handles <br>, <p>, strings, etc.)
-            if isinstance(sib, str):
-                parts.append(sib)
-            else:
-                parts.append(self.text(sib))
-        # Normalize text
-        value = " ".join(p.strip() for p in parts if p and p.strip())
-        val_raw = list_items if list_items is not None else value
-        if isinstance(val_raw, list):
-            val = "\n".join(x.strip() for x in val_raw if isinstance(x, str))
-        else:
-            val = (val_raw or "").strip()
-        return val
-
-    def extract_insets(self, soup: BS) -> Dict[str, str]:
-        """
-        Extract inset values from the detail page (location, etc.).
-
-        Args:
-            soup: Parsed BeautifulSoup document for a job detail page.
-
-        Returns:
-            Mapping from 'inset.<Label>' to string values.
-
-        Raises:
-            None
-        """
-        out: Dict[str, str] = {}
-        for dl in soup.select(".career-search-result__insets dl"):
-            dt = dl.find("dt")
-            dts = dt.get_text(" ", strip=True) if dt else ""
-            # Some have icon-only <dt> (e.g., location). Use dd when dt is empty.
-            dds = "; ".join(dd.get_text(" ", strip=True) for dd in dl.find_all("dd"))
-            key = dts if dts else "Location"
-            if key and dds:
-                out[f"inset.{key}"] = dds
-        return out
-
-    def extract_bold_block(self, soup: BS) -> Dict[str, str]:
-        """
-        Parse labeled blocks under '.career-detail-description'.
-
-        Args:
-            soup: Parsed BeautifulSoup document.
-
-        Returns:
-            Flat mapping of labels to strings. For sections that are lists,
-            items are joined with '; '. Adds 'Page Title' if a title is found.
-
-        Raises:
-            None
-        """
-        data: Dict[str, Any] = {}
-        container = soup.select_one(".career-detail-description") or soup
-        for b in container.find_all("b"):
-            label = self.text(b).rstrip(":").strip()
-            if not label:
-                continue
-            val = self.collect_until_next_b(b)
-            # If multiple same labels appear, keep the richest (list beats text, longer text beats shorter)
-            if label in data:
-                cur = data[label]
-
-                def score(v: Any) -> Tuple[int, int]:
-                    return (1, len(v)) if isinstance(v, list) else (0, len(v or ""))
-
-                if score(val) > score(cur):
-                    data[label] = val
-            else:
-                data[label] = val
-        # Flatten lists into strings (or keep lists if you prefer arrays)
-        for k, v in list(data.items()):
-            if isinstance(v, list):
-                data[k] = "; ".join(v)
-        # Add the H1 title as a convenience if present
-        h1 = soup.select_one(".career-detail-title, h1")
-        if h1 and "Page Title" not in data:
-            data["Page Title"] = self.text(h1)
-        # Type-narrow to str values
-        return {k: str(v) for k, v in data.items()}
-
-    def extract_jsonld(self, soup: BS) -> Dict[str, Any]:
-        """
-        Extract and flatten JSON-LD script blocks into a dotted-key mapping.
-
-        Args:
-            soup: Parsed BeautifulSoup document.
-
-        Returns:
-            Dictionary containing flattened JSON-LD data with prefixes 'ld' or 'ld[i]'.
-
-        Raises:
-            None (malformed/empty blocks are ignored).
-        """
-        out: Dict[str, Any] = {}
-        blocks = soup.find_all("script", attrs={"type": "application/ld+json"})
-        for b in blocks:
-            try:
-                data = json.loads(b.string or b.get_text() or "")
-            except Exception:
-                continue
-            if isinstance(data, list):
-                for i, item in enumerate(data):
-                    self.flatten(f"ld[{i}]", item, out)
-            else:
-                self.flatten("ld", data, out)
-        return out
-
-    def extract_meta(self, soup: BS) -> Dict[str, str]:
-        """
-        Extract basic <meta> values and the first <h1> when available.
-
-        Args:
-            soup: Parsed BeautifulSoup document.
-
-        Returns:
-            Dictionary mapping meta names/properties to content (prefixed with 'meta.'),
-            plus 'h1' when present.
-
-        Raises:
-            None
-        """
-        out: Dict[str, str] = {}
-        for m in soup.find_all("meta"):
-            name = m.get("name") or m.get("property")
-            if not name:
-                continue
-            content = m.get("content")
-            if content is None:
-                continue
-            key = f"meta.{name}"
-            if key not in out:
-                out[key] = content
-        h1 = soup.find("h1")
-        if h1 and "text" not in out:
-            out["h1"] = h1.get_text(strip=True)
-        return out
-
-    def extract_datalayer(self, html: str) -> Dict[str, str]:
-        """
-        Parse `window.dataLayer.push({...})` calls into a flat mapping.
-
-        Args:
-            html: Raw HTML of a job detail page.
-
-        Returns:
-            Dictionary mapping 'datalayer.<key>' to extracted values.
-
-        Raises:
-            None
-        """
-        out: Dict[str, str] = {}
-        for m in re.finditer(
-            r"window\.dataLayer\.push\(\{([^)]*?)\}\)", html, re.I | re.M | re.S
-        ):
-            body = m.group(1)
-            for k, v in re.findall(
-                r"['\"]([^'\"]+)['\"]\s*:\s*['\"]([^'\"]*)['\"]", body
-            ):
-                out[f"datalayer.{k}"] = v
-        return out
-
     # -------------------------------------------------------------------------
     # Detail fetch/parse helpers
     # -------------------------------------------------------------------------
-    def fetch_job_detail_html(self, url: str) -> str:
-        """
-        Fetch the HTML for a given job detail URL.
-
-        Args:
-            url: Absolute URL to the job detail page.
-
-        Returns:
-            Raw HTML string.
-
-        Raises:
-            requests.RequestException: If the HTTP request fails.
-        """
-        r = self.session.get(url, timeout=30)
-        r.raise_for_status()
-        return r.text
-
     def parse_job_detail_doc(self, html: str) -> Dict[str, str]:
         """
         Parse a job detail HTML document and extract labeled fields.
@@ -414,8 +115,8 @@ class GeneralDynamicsScraper(JobScraper):
         """
         soup = BS(html, "html.parser")
         out: Dict[str, str] = {}
-        out.update(self.extract_insets(soup))
-        out.update(self.extract_bold_block(soup))
+        out.update(extract_insets(soup))
+        out.update(extract_bold_block(soup))
         return out
 
     # -------------------------------------------------------------------------
@@ -522,7 +223,7 @@ class GeneralDynamicsScraper(JobScraper):
                     "what": "",
                     "usedPlacesApi": False,
                 }
-            token = self.b64url_encode(payload)
+            token = b64url_encode(payload)
             try:
                 data, _ = self.call_api(token)
             except requests.HTTPError as e:
@@ -621,7 +322,7 @@ class GeneralDynamicsScraper(JobScraper):
         """
         warns = 0
         detail_rel = raw_job.get("detail_url", "")
-        detail_url = self.absolute_url(detail_rel)
+        detail_url = urljoin("https://www.gd.com", detail_rel or "")
         record = {
             "Detail URL": detail_url,
             "Position Title": raw_job.get("title", ""),
@@ -631,9 +332,16 @@ class GeneralDynamicsScraper(JobScraper):
         }
         try:
             self.log("detail:fetch", url=detail_url)
-            html = self.fetch_job_detail_html(detail_url)
-            doc = self.parse_job_detail_doc(html)
-            record.update(doc)
+            # Use the unified artifact fetcher (rides this scraper's session)
+            artifacts = fetch_detail_artifacts(self.session.get, self.log, detail_url)
+            html = artifacts.get("_html", "")
+            if html:
+                doc = self.parse_job_detail_doc(html)
+                record.update(doc)
+            # Prefer canonical URL if present
+            canon = artifacts.get("_canonical_url")
+            if canon:
+                record["Detail URL"] = canon
         except requests.RequestException as e:
             status = getattr(getattr(e, "response", None), "status_code", None)
             self.log(

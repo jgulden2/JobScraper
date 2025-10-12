@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from bs4 import BeautifulSoup as BS
+from utils.canonicalizer import Canonicalizer, CANON_FIELDS
 
 
 class JobScraper:
@@ -79,6 +80,9 @@ class JobScraper:
         self.default_timeout = 30.0
         # Shared requests.Session with retry/backoff enabled
         self.session = self.build_session_with_retries()
+        self.canonicalizer = Canonicalizer()
+        self.write_full_also = True
+        self.jobs_full: List[dict] = []
 
     def fmt_pairs(self, **kv: Any) -> str:
         """
@@ -421,20 +425,55 @@ class JobScraper:
         self.log("dedupe_raw:unique", n=len(data))
 
         self.log("parse:start", total=len(data))
-        parsed: List[Dict[str, Any]] = []
+        parsed_min: List[Dict[str, Any]] = []
+        parsed_full: List[Dict[str, Any]] = []
+
+        vendor_name = self.__class__.__name__.replace("Scraper", "")
+
         for idx, raw in enumerate(data, 1):
             try:
                 rec = self.parse_job(raw)
-                if rec:
-                    parsed.append(rec)
-                    if idx == 1 or idx % self.log_every == 0:
-                        self.log("parse:progress", idx=idx, total=len(data))
+                if not rec:
+                    continue
+
+                artifacts = rec.pop("artifacts", None)
+                if artifacts is None:
+                    artifacts = {
+                        "_html": rec.pop("_html", None),
+                        "_vendor_blob": rec.pop("_vendor_blob", None),
+                        "_jsonld": rec.pop("_jsonld", None),
+                        "_meta": rec.pop("_meta", None),
+                        "_datalayer": rec.pop("_datalayer", None),
+                        "_canonical_url": rec.pop("_canonical_url", None),
+                    }
+                    if not any(artifacts.values()):
+                        artifacts = None
+
+                out_full = self.canonicalizer.canonicalize(
+                    vendor=vendor_name,
+                    record=rec,
+                    artifacts=artifacts,
+                )
+
+                # Canonical-only view
+                out_min = {k: out_full.get(k, "") for k in CANON_FIELDS}
+
+                parsed_full.append(out_full)
+                parsed_min.append(out_min)
+
+                if idx == 1 or idx % self.log_every == 0:
+                    self.log("parse:progress", idx=idx, total=len(data))
             except Exception:
                 errors += 1
                 self.logger.exception("parse:error")
 
-        parsed = self.dedupe_records(parsed)
-        self.jobs = parsed
+        # De-duplicate both views using the same keys
+        parsed_min = self.dedupe_records(parsed_min)
+        if self.write_full_also:
+            parsed_full = self.dedupe_records(parsed_full)
+            self.jobs_full = parsed_full
+
+        self.jobs = parsed_min
 
         self.log("dedupe_records:unique", n=len(self.jobs))
         self.log("done", count=len(self.jobs))
@@ -461,3 +500,8 @@ class JobScraper:
         """
         df = pd.DataFrame(self.jobs)
         df.to_csv(filename, index=False)
+        if self.write_full_also and getattr(self, "jobs_full", None):
+            stem, ext = (filename.rsplit(".", 1) + ["csv"])[:2]
+            full_path = f"{stem}.full.{ext}"
+            pd.DataFrame(self.jobs_full).to_csv(full_path, index=False)
+            self.log("export:full", path=full_path, n=len(self.jobs_full))
