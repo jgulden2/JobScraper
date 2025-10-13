@@ -5,7 +5,6 @@ from utils.schema import CANON_COLUMNS, validate_row
 from utils.transforms import (
     normalize_url,
     parse_salary,
-    normalize_location,
     parse_date,
     sanitize_description,
 )
@@ -32,11 +31,6 @@ def canonicalize_record(vendor: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         out["Salary Min (USD/yr)"] = smin
         out["Salary Max (USD/yr)"] = smax
         out["Salary Raw"] = rawsal or out.get("Salary Raw")
-
-    # Normalize location fields from Raw Location, but don't overwrite explicit fields
-    loc = normalize_location(out.get("Raw Location"))
-    for k in ["Raw Location", "Country", "State", "City", "Postal Code"]:
-        out[k] = out.get(k) or loc.get(k)
 
     desc = out.get("Description")
     if desc:

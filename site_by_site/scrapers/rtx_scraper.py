@@ -71,7 +71,6 @@ class RTXScraper(JobScraper):
         )
         self.job_detail_url_template = "https://careers.rtx.com/global/en/job/{job_id}/"
         self.page_size = 10
-        self.suppress_console = False
 
     # -------------------------------------------------------------------------
     # Identity

@@ -22,7 +22,6 @@ from urllib3.util.retry import Retry
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from bs4 import BeautifulSoup as BS
 from utils.schema import CANON_COLUMNS
 from utils.canonicalize import canonicalize_record
 
@@ -172,21 +171,6 @@ class JobScraper:
     # -----------------------------
     # Shared utilities
     # -----------------------------
-    def clean_html(self, raw_html: Optional[str]) -> str:
-        """
-        Remove HTML tags and return plain text content.
-
-        Args:
-            raw_html: An HTML snippet or full document string.
-
-        Returns:
-            A plain-text version of the input with whitespace normalized. Returns
-            an empty string if input is None or empty.
-        """
-        if not raw_html:
-            return ""
-        return BS(raw_html, "html.parser").get_text(separator=" ", strip=True)
-
     def dedupe_raw(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Remove duplicate raw items using `raw_id`.

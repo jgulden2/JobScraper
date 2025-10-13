@@ -128,7 +128,7 @@ def run_scraper(
         registry: Mapping of scraper names to scraper classes.
 
     Returns:
-        None
+        ScraperProtocol or None
 
     Raises:
         KeyError: If the scraper name is not present in the registry.
@@ -184,7 +184,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--logfile",
         type=str,
         default="run.log",
-        help="Path to log file (defrault: run.log).",
+        help="Path to log file (default: run.log).",
     )
     parser.add_argument(
         "--suppress",
@@ -193,9 +193,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--testing",
-        type=lambda x: str(x).lower() == "true",
-        default=False,
-        help="Run in testing mode with a small sample of jobs.",
+        nargs="?",
+        const="true",
+        default="false",
+        help='Enable testing mode (can optionally specify limit, e.g. "--testing 10")',
     )
     parser.add_argument(
         "--combine-full",
@@ -224,11 +225,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
 
+    if args.testing.lower() == "false":
+        testing = False
+        test_limit = None
+    else:
+        testing = True
+        try:
+            test_limit = int(args.testing)
+        except ValueError:
+            test_limit = None
+
     # Run selected scrapers (or all if none specified) and keep handles.
     to_run = list(args.scrapers or SCRAPER_MAPPING.keys())
     ran: list[ScraperProtocol] = []
     for scraper_name in to_run:
         s = run_scraper(scraper_name, testing=args.testing)
+        s.testing = testing
+        s.test_limit = test_limit
         if s is not None:
             ran.append(s)
 

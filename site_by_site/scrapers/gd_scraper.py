@@ -63,7 +63,6 @@ class GeneralDynamicsScraper(JobScraper):
             requests.RequestException: If the warm-up GET to `JOB_SEARCH_URL` fails.
         """
         super().__init__(base_url=self.START_URL, headers={"User-Agent": "Mozilla/5.0"})
-        self.suppress_console = False
         self.testing = getattr(self, "testing", False)
 
         self.session = requests.Session()

@@ -31,7 +31,6 @@ class NorthropGrummanScraper(JobScraper):
 
     START_URL = "https://jobs.northropgrumman.com/careers"
     API_URL = "https://jobs.northropgrumman.com/api/apply/v2/jobs"
-    CAREER_DETAIL_URL_TEMPLATE = "https://jobs.northropgrumman.com/careers?pid={pid}&domain=ngc.com&sort_by=recent"
 
     def __init__(self) -> None:
         """
@@ -48,7 +47,6 @@ class NorthropGrummanScraper(JobScraper):
                 `START_URL` fails (network errors, timeouts).
         """
         super().__init__(base_url=self.START_URL, headers={"User-Agent": "Mozilla/5.0"})
-        self.suppress_console = False
         self.testing = getattr(self, "testing", False)
 
         self.session = requests.Session()

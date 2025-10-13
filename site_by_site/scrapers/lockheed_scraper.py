@@ -48,7 +48,6 @@ class LockheedMartinScraper(JobScraper):
         self.visited_job_ids: Set[str] = set()
         self.max_pages: Optional[int] = max_pages
         self.delay = delay
-        self.suppress_console = False
 
     # -------------------------------------------------------------------------
     # Identity

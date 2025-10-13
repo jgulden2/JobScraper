@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from bs4 import BeautifulSoup as BS
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 from datetime import datetime, timedelta
 
@@ -18,17 +18,6 @@ def normalize_url(u: Optional[str]) -> Optional[str]:
         return None
     except Exception:
         return None
-
-
-def to_bool(x: Any) -> Optional[bool]:
-    if x is None:
-        return None
-    s = str(x).strip().lower()
-    if s in {"true", "yes", "y", "1"}:
-        return True
-    if s in {"false", "no", "n", "0"}:
-        return False
-    return None
 
 
 def parse_date(s: Optional[str], anchor_dt: Optional[datetime] = None) -> Optional[str]:
@@ -117,116 +106,24 @@ def parse_salary(
     return a, b, raw
 
 
-def parse_clearance_level(text: Optional[str]) -> Optional[str]:
-    if not text:
-        return None
-    s = text.lower()
-    if "fs poly" in s:
-        return "TS/SCI w/ FS Poly"
-    if "ci poly" in s:
-        return "TS/SCI w/ CI Poly"
-    if "ts/sci" in s or "ts sci" in s or "tsci" in s:
-        return "TS/SCI"
-    if re.search(r"\btop\s*secret\b", s):
-        return "TS"
-    if "secret" in s:
-        return "Secret"
-    if "public trust" in s:
-        return "PublicTrust"
-    if "confidential" in s:
-        return "Confidential"
-    return "None"
-
-
-def parse_remote_status(text: Optional[str]) -> Optional[str]:
-    if not text:
-        return None
-    s = text.lower()
-    if "remote" in s and "hybrid" in s:
-        return "Hybrid"
-    if "remote" in s:
-        return "Remote"
-    if "hybrid" in s:
-        return "Hybrid"
-    if "on-site" in s or "onsite" in s:
-        return "Onsite"
-    return "Unspecified"
-
-
-def parse_fulltime_status(text: Optional[str]) -> Optional[str]:
-    if not text:
-        return None
-    s = text.lower()
-    if "full" in s:
-        return "Full-time"
-    if "part" in s:
-        return "Part-time"
-    if "contract" in s or "contingent" in s or "1099" in s:
-        return "Contract"
-    if "intern" in s:
-        return "Intern"
-    if "temporary" in s or "temp" in s:
-        return "Temporary"
-    return "Unspecified"
-
-
-def parse_int(x: Any) -> Optional[int]:
-    if x is None:
-        return None
-    try:
-        return int(float(str(x).replace("%", "").strip()))
-    except Exception:
-        return None
-
-
-def parse_skills(text: Optional[str]) -> List[str]:
-    if not text:
-        return []
-    s = re.split(r"[;,\n]", text)
-    return [t.strip() for t in s if t.strip()]
-
-
-def normalize_location(raw: Optional[str]) -> Dict[str, Optional[str]]:
-    if not raw:
-        return {
-            "Raw Location": None,
-            "Country": None,
-            "State": None,
-            "City": None,
-            "Postal Code": None,
-        }
-    t = raw.strip()
-    parts = [p.strip() for p in t.split(",")]
-    city = None
-    state = None
-    postal = None
-    country = None
-    if len(parts) == 1:
-        city = parts[0] or None
-    elif len(parts) == 2:
-        city, state = parts
-    elif len(parts) >= 3:
-        city, state, rest = parts[0], parts[1], ",".join(parts[2:])
-        m = re.search(r"(\d{5}(?:-\d{4})?)", rest)
-        postal = m.group(1) if m else None
-        country = rest.replace(postal or "", "").strip(" ,") or None
-    return {
-        "Raw Location": raw,
-        "Country": country,
-        "State": state,
-        "City": city,
-        "Postal Code": postal,
-    }
-
-
 def sanitize_description(raw: Optional[str]) -> str:
     if not raw:
         return ""
     s = str(raw)
-    s = s.replace("</br>", "<br>").replace("<br/>", "<br>")
+    # normalize common line-break variants early
+    s = (
+        s.replace("</br>", "<br>")
+        .replace("<br/>", "<br>")
+        .replace("<BR/>", "<br>")
+        .replace("<BR>", "<br>")
+    )
     soup = BS(s, "html.parser")
     for tag in soup.find_all(["script", "style"]):
         tag.decompose()
+    # turn structural blocks into line breaks so content stays readable
+    for p in soup.find_all(["p", "div"]):
+        if p.find("br") is None:
+            p.append(soup.new_string("\n"))
     for br in soup.find_all("br"):
         br.replace_with("\n")
     for li in soup.find_all("li"):

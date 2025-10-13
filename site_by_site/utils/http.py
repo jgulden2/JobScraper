@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import base64
 
+from typing import Dict
+
 
 def b64url_decode(s: str) -> str:
     """
@@ -22,12 +24,12 @@ def b64url_decode(s: str) -> str:
     return base64.urlsafe_b64decode(s.encode("utf-8")).decode("utf-8")
 
 
-def b64url_encode(obj: str) -> str:
+def b64url_encode(obj: Dict) -> str:
     """
-    Encode a Python object to compact JSON, then base64url without padding.
+    Encode a dictionary to compact JSON, then base64url without padding.
 
     Args:
-        obj: JSON-serializable object.
+        obj: JSON-serializable dictionary.
 
     Returns:
         Base64url-encoded string with trailing '=' padding removed.

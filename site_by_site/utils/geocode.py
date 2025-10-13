@@ -5,25 +5,9 @@ import json
 import os
 import sqlite3
 
-from dataclasses import dataclass
 from time import time, sleep
 from typing import Dict, Iterable, Optional
 from geopy.geocoders import Nominatim
-
-
-@dataclass
-class GeoRecord:
-    query: str
-    address: str = ""
-    lat: Optional[float] = None
-    lon: Optional[float] = None
-    country: str = ""
-    country_code: str = ""
-    state: str = ""
-    county: str = ""
-    city: str = ""
-    postcode: str = ""
-    raw: Dict = None
 
 
 def ensure_db(path: str) -> sqlite3.Connection:

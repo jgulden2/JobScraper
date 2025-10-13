@@ -32,7 +32,6 @@ class BAESystemsScraper(JobScraper):
         Returns:
             None
         """
-        self.suppress_console = False
         super().__init__(
             base_url="https://jobs.baesystems.com/global/en/search-results",
             headers={"User-Agent": "Mozilla/5.0"},
@@ -139,8 +138,8 @@ class BAESystemsScraper(JobScraper):
             "Salary Max (USD/yr)": ph.get("salaryMax"),
             "Bonus": ph.get("bonus"),
             "Remote Status": ph.get("physicalLocation"),
-            "Full Time Status": ph.get("structureData").get("employmentType"),
-            "Hours Per Week": ph.get("structureData").get("workHours"),
+            "Full Time Status": ph.get("structureData", {}).get("employmentType"),
+            "Hours Per Week": ph.get("structureData", {}).get("workHours"),
             "Travel Percentage": ph.get("travelPercentage"),
             "Job Category": ph.get("category"),
             "Business Sector": ph.get("sector"),

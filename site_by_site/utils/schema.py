@@ -84,10 +84,6 @@ CANON_COLUMNS = [
 REQUIRED_COLUMNS = ["Vendor", "Position Title", "Detail URL"]
 
 
-def empty_row() -> Dict[str, Any]:
-    return {k: None for k in CANON_COLUMNS}
-
-
 def validate_row(row: Dict[str, Any]):
     errors = []
     for k in REQUIRED_COLUMNS:
