@@ -7,7 +7,7 @@ details by parsing the client-side phApp.ddo payload from each job page.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from scrapers.base import JobScraper
 from utils.extractors import extract_phapp_ddo, extract_total_results
@@ -36,18 +36,6 @@ class BAESystemsScraper(JobScraper):
             base_url="https://jobs.baesystems.com/global/en/search-results",
             headers={"User-Agent": "Mozilla/5.0"},
         )
-
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Return the stable raw identifier used for de-duplication.
-
-        Args:
-            raw_job: Raw listing item from the listing payload.
-
-        Returns:
-            The job's unique ID string or None if unavailable.
-        """
-        return raw_job.get("jobId")
 
     def fetch_data(self) -> List[Dict[str, Any]]:
         """

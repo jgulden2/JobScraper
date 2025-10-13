@@ -79,24 +79,6 @@ class GeneralDynamicsScraper(JobScraper):
         self.session.get(self.JOB_SEARCH_URL, timeout=30)
 
     # -------------------------------------------------------------------------
-    # Identity
-    # -------------------------------------------------------------------------
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Return the stable raw identifier for de-duplication.
-
-        Args:
-            raw_job: Raw listing item as returned by the careers API.
-
-        Returns:
-            The job's unique identifier string, or None if unavailable.
-
-        Raises:
-            None
-        """
-        return raw_job.get("id")
-
-    # -------------------------------------------------------------------------
     # API interaction
     # -------------------------------------------------------------------------
     def call_api(self, request_token: str) -> Tuple[Dict[str, Any], str]:

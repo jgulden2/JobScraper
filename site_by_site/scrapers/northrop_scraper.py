@@ -62,24 +62,6 @@ class NorthropGrummanScraper(JobScraper):
         self.session.get(self.START_URL, timeout=30)
 
     # -------------------------------------------------------------------------
-    # Identity
-    # -------------------------------------------------------------------------
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Return a stable raw identifier for de-duplication.
-
-        Args:
-            raw_job: Raw listing dictionary from the API.
-
-        Returns:
-            The ATS job ID if present, otherwise `pid`; or None if neither exists.
-
-        Raises:
-            None
-        """
-        return raw_job.get("ats_job_id") or raw_job.get("pid")
-
-    # -------------------------------------------------------------------------
     # Listing
     # -------------------------------------------------------------------------
     def fetch_data(self) -> List[Dict[str, Any]]:

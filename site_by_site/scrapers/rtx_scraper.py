@@ -12,7 +12,7 @@ import os
 import time
 import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from scrapers.base import JobScraper
 from utils.extractors import extract_phapp_ddo, extract_total_results
@@ -71,21 +71,6 @@ class RTXScraper(JobScraper):
         )
         self.job_detail_url_template = "https://careers.rtx.com/global/en/job/{job_id}/"
         self.page_size = 10
-
-    # -------------------------------------------------------------------------
-    # Identity
-    # -------------------------------------------------------------------------
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Return the job ID for de-duplication.
-
-        Args:
-            raw_job: Raw job dictionary from `phApp.ddo`.
-
-        Returns:
-            The job's 'jobId' string, or None if unavailable.
-        """
-        return raw_job.get("jobId")
 
     # -------------------------------------------------------------------------
     # Fetch listings

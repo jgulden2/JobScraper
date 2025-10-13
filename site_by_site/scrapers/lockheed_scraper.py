@@ -9,11 +9,12 @@ a normalized record for export.
 from __future__ import annotations
 
 from time import sleep
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 from bs4 import BeautifulSoup as BS
 
 from scrapers.base import JobScraper
+from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts
 
 
@@ -48,24 +49,6 @@ class LockheedMartinScraper(JobScraper):
         self.visited_job_ids: Set[str] = set()
         self.max_pages: Optional[int] = max_pages
         self.delay = delay
-
-    # -------------------------------------------------------------------------
-    # Identity
-    # -------------------------------------------------------------------------
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Extract a stable identifier for de-duplication of parsed records.
-
-        Args:
-            raw_job: The raw job object produced during fetch.
-
-        Returns:
-            The vendor job ID string, or None if not present.
-
-        Raises:
-            None
-        """
-        return raw_job.get("job_id")
 
     # -------------------------------------------------------------------------
     # Lifecycle
@@ -109,13 +92,29 @@ class LockheedMartinScraper(JobScraper):
         """
         Convert the listing entry to a minimal record + artifacts for canonicalization.
         """
-        url = job_entry["url"]
-        job_id = job_entry["job_id"]
+        url = job_entry["Detail URL"]
+        job_id = job_entry["Posting ID"]
         artifacts = fetch_detail_artifacts(self.get, self.log, url)
+        jsonld = artifacts.get("_jsonld")
+        meta = artifacts.get("_meta")
+        soup = BS(artifacts.get("_html"), "html.parser")
+        blocks = extract_bold_block(soup)
         return {
-            "posting_id": job_id,
-            "detail_url": artifacts.get("_canonical_url") or url,
-            "artifacts": artifacts,
+            "Posting ID": job_id,
+            "Position Title": jsonld.get("title"),
+            "Detail URL": artifacts.get("_canonical_url") or url,
+            "Description": "; ".join(blocks.values()),
+            "Post Date": jsonld.get("datePosted"),
+            "Required Education": jsonld.get("educationRequirements"),
+            "Clearance Level Must Possess": jsonld.get("employmentType"),
+            "Required Skills": jsonld.get("qualifications"),
+            "City": jsonld.get("jobLocation.0.address.addressLocality"),
+            "State": jsonld.get("jobLocation.0.address.addressRegion"),
+            "Country": jsonld.get("jobLocation.0.address.addressCountry"),
+            "Postal Code": jsonld.get("jobLocation.0.address.postalCode"),
+            "Business Sector": meta.get("gtm_tbcn_division"),
+            "Raw Location": meta.get("gtm_tbcn_location"),
+            "Business Area": jsonld.get("industry"),
         }
 
     # -------------------------------------------------------------------------
@@ -173,6 +172,6 @@ class LockheedMartinScraper(JobScraper):
                 continue
             self.visited_job_ids.add(job_id)
             full_url = f"{self.BASE_URL}{href}"
-            job_links.append({"job_id": job_id, "url": full_url})
+            job_links.append({"Posting ID": job_id, "Detail URL": full_url})
 
         return job_links

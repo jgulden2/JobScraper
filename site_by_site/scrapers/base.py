@@ -3,7 +3,7 @@ Base scraper class and common utilities.
 
 `JobScraper` defines the standard lifecycle (fetch → dedupe → parse → export)
 and shared helpers for logging, HTML cleaning, and record de-duplication.
-Subclasses should override `fetch_data`, `parse_job`, and `raw_id`.
+Subclasses should override `fetch_data` and `parse_job`.
 
 Typical usage (via the CLI):
     scraper = SomeVendorScraper()
@@ -30,7 +30,7 @@ class JobScraper:
     """
     Abstract base class for all job scrapers.
 
-    Subclasses must implement `fetch_data`, `parse_job`, and `raw_id`. The
+    Subclasses must implement `fetch_data` and `parse_job`. The
     `run()` method orchestrates the full scraping pipeline and stores parsed
     records on `self.jobs`. Results can be exported with `export()`.
 
@@ -151,49 +151,9 @@ class JobScraper:
         """
         raise NotImplementedError
 
-    def raw_id(self, raw_job: Dict[str, Any]) -> Optional[str]:
-        """
-        Extract a stable raw identifier for de-duplication.
-
-        Args:
-            raw_job: One raw listing item as returned by `fetch_data`.
-
-        Returns:
-            The item's unique identifier (e.g., vendor job ID), or None if not
-            available.
-
-        Raises:
-            NotImplementedError: Subclasses may override this to enforce that an
-                ID must exist; the base implementation does not raise.
-        """
-        return None
-
     # -----------------------------
     # Shared utilities
     # -----------------------------
-    def dedupe_raw(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Remove duplicate raw items using `raw_id`.
-
-        Args:
-            data: The list of raw listing items to de-duplicate.
-
-        Returns:
-            A list with duplicate raw items removed (stable order preserved).
-        """
-        seen: set[str] = set()
-        out: List[Dict[str, Any]] = []
-        for r in data:
-            rid = self.raw_id(r)
-            if not rid:
-                out.append(r)
-                continue
-            if rid in seen:
-                continue
-            seen.add(rid)
-            out.append(r)
-        return out
-
     def dedupe_records(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Remove duplicate parsed job records.
@@ -377,7 +337,6 @@ class JobScraper:
         Lifecycle:
             1) fetch_data()
             2) optional slice for testing mode
-            3) dedupe_raw()
             4) parse each raw item → accumulate parsed records
             5) dedupe_records()
             6) finalize self.jobs
@@ -404,9 +363,6 @@ class JobScraper:
             data = data[: self.test_limit]
 
         self.log("fetch:done", n=len(data))
-
-        data = self.dedupe_raw(data)
-        self.log("dedupe_raw:unique", n=len(data))
 
         self.log("parse:start", total=len(data))
         parsed_min: List[Dict[str, Any]] = []

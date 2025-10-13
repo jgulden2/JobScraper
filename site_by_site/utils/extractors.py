@@ -58,7 +58,7 @@ def extract_jsonld(soup: BS) -> Dict[str, Any]:
     blocks = soup.find_all("script", attrs={"type": "application/ld+json"})
     for b in blocks:
         try:
-            data = json.loads(b.string or b.get_text() or "")
+            data = json.loads(b.string or b.get_text() or "", strict=False)
         except Exception:
             continue
         if isinstance(data, list):
