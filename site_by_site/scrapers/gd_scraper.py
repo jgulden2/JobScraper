@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup as BS
 
 from scrapers.base import JobScraper
 from utils.http import b64url_encode
-from utils.extractors import extract_insets, extract_bold_block
+from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts
 from traceback import format_exc
 
@@ -95,28 +95,6 @@ class GeneralDynamicsScraper(JobScraper):
             None
         """
         return raw_job.get("id")
-
-    # -------------------------------------------------------------------------
-    # Detail fetch/parse helpers
-    # -------------------------------------------------------------------------
-    def parse_job_detail_doc(self, html: str) -> Dict[str, str]:
-        """
-        Parse a job detail HTML document and extract labeled fields.
-
-        Args:
-            html: Raw HTML of the job detail page.
-
-        Returns:
-            Dictionary of extracted fields (insets + bold blocks).
-
-        Raises:
-            None
-        """
-        soup = BS(html, "html.parser")
-        out: Dict[str, str] = {}
-        out.update(extract_insets(soup))
-        out.update(extract_bold_block(soup))
-        return out
 
     # -------------------------------------------------------------------------
     # API interaction
@@ -273,15 +251,28 @@ class GeneralDynamicsScraper(JobScraper):
             self.log("list:page", page=page, page_size=page_size, got=len(results))
 
             for item in results:
-                link = (item.get("Link") or {}).get("Url") or ""
+                link = (item.get("Link") or {}).get("Url")
                 if link:
+                    loc0 = ((item.get("Locations") or [{}])[0]) or {}
+                    workplace_options = item.get("WorkplaceOptions") or []
                     jobs.append(
                         {
-                            "detail_url": link,
-                            "title": item.get("Title") or "",
-                            "id": str(item.get("Id") or ""),
-                            "company": item.get("Company") or "",
-                            "location": "; ".join(item.get("LocationNames") or []),
+                            "Detail URL": link,
+                            "Posting ID": item.get("ReferenceCode"),
+                            "Full Time Status": ", ".join(item.get("EmploymentTypes")),
+                            "Job Category": item.get("Category"),
+                            "Clearance Level Must Possess": item.get("Clearance"),
+                            "Position Title": item.get("Title"),
+                            "Post Date": item.get("Date"),
+                            "Country": loc0.get("Country"),
+                            "State": loc0.get("State"),
+                            "Latitude": loc0.get("Latitude"),
+                            "Longitude": loc0.get("Longitude"),
+                            "Business Area": item.get("Company"),
+                            "Raw Location": loc0.get("Name"),
+                            "Remote Status": ""
+                            if len(workplace_options) == 0
+                            else ", ".join(workplace_options),
                         }
                     )
                     fetched += 1
@@ -320,23 +311,27 @@ class GeneralDynamicsScraper(JobScraper):
             parse issues occur.
         """
         warns = 0
-        detail_rel = raw_job.get("detail_url", "")
+        detail_rel = raw_job.get("Detail URL", "")
         detail_url = urljoin("https://www.gd.com", detail_rel or "")
-        record = {
-            "detail_url": detail_url,
-            "title": raw_job.get("title", ""),
-            "location": raw_job.get("location", ""),
-            "posting_id": raw_job.get("id", ""),
-        }
+        record = dict(raw_job)
+        record["Detail URL"] = detail_url
+        record["Position Title"] = record.get("Position Title", "")
         try:
             self.log("detail:fetch", url=detail_url)
             # Use the unified artifact fetcher (rides this scraper's session)
             artifacts = fetch_detail_artifacts(self.session.get, self.log, detail_url)
             html = artifacts.get("_html", "")
-            if html:
-                doc = self.parse_job_detail_doc(html)
-                record.update(doc)
-            # Prefer canonical URL if present
+            soup = BS(html, "html.parser")
+            blocks = extract_bold_block(soup)
+
+            desc = "; ".join(blocks.values())
+            record.update(
+                {
+                    "Description": desc,
+                    "Career Level": blocks.get("Career Level"),
+                }
+            )
+
             canon = artifacts.get("_canonical_url")
             if canon:
                 record["Detail URL"] = canon

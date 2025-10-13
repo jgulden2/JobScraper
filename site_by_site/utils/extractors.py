@@ -259,31 +259,6 @@ def collect_until_next_b(start_b: Any) -> str:
     return val
 
 
-def extract_insets(soup: BS) -> Dict[str, str]:
-    """
-    Extract inset values from the detail page (location, etc.).
-
-    Args:
-        soup: Parsed BeautifulSoup document for a job detail page.
-
-    Returns:
-        Mapping from 'inset.<Label>' to string values.
-
-    Raises:
-        None
-    """
-    out: Dict[str, str] = {}
-    for dl in soup.select(".career-search-result__insets dl"):
-        dt = dl.find("dt")
-        dts = dt.get_text(" ", strip=True) if dt else ""
-        # Some have icon-only <dt> (e.g., location). Use dd when dt is empty.
-        dds = "; ".join(dd.get_text(" ", strip=True) for dd in dl.find_all("dd"))
-        key = dts if dts else "Location"
-        if key and dds:
-            out[f"inset.{key}"] = dds
-    return out
-
-
 def extract_bold_block(soup: BS) -> Dict[str, str]:
     """
     Parse labeled blocks under '.career-detail-description'.
