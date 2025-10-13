@@ -23,7 +23,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from bs4 import BeautifulSoup as BS
-from utils.canonicalizer import Canonicalizer, CANON_FIELDS
+from utils.schema import CANON_COLUMNS
+from utils.canonicalize import canonicalize_record
 
 
 class JobScraper:
@@ -80,7 +81,6 @@ class JobScraper:
         self.default_timeout = 30.0
         # Shared requests.Session with retry/backoff enabled
         self.session = self.build_session_with_retries()
-        self.canonicalizer = Canonicalizer()
         self.write_full_also = True
         self.jobs_full: List[dict] = []
 
@@ -437,29 +437,15 @@ class JobScraper:
                     continue
 
                 artifacts = rec.pop("artifacts", None)
-                if artifacts is None:
-                    artifacts = {
-                        "_html": rec.pop("_html", None),
-                        "_vendor_blob": rec.pop("_vendor_blob", None),
-                        "_jsonld": rec.pop("_jsonld", None),
-                        "_meta": rec.pop("_meta", None),
-                        "_datalayer": rec.pop("_datalayer", None),
-                        "_canonical_url": rec.pop("_canonical_url", None),
-                    }
-                    if not any(artifacts.values()):
-                        artifacts = None
 
-                out_full = self.canonicalizer.canonicalize(
-                    vendor=vendor_name,
-                    record=rec,
-                    artifacts=artifacts,
-                )
+                full_row = {"Vendor": vendor_name, **rec}
+                if artifacts:
+                    full_row["_artifacts"] = artifacts
 
-                # Canonical-only view
-                out_min = {k: out_full.get(k, "") for k in CANON_FIELDS}
+                canon_row = canonicalize_record(vendor=vendor_name, raw=rec)
 
-                parsed_full.append(out_full)
-                parsed_min.append(out_min)
+                parsed_full.append(full_row)
+                parsed_min.append({k: canon_row.get(k, "") for k in CANON_COLUMNS})
 
                 if idx == 1 or idx % self.log_every == 0:
                     self.log("parse:progress", idx=idx, total=len(data))

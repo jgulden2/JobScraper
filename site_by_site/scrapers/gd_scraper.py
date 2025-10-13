@@ -324,11 +324,10 @@ class GeneralDynamicsScraper(JobScraper):
         detail_rel = raw_job.get("detail_url", "")
         detail_url = urljoin("https://www.gd.com", detail_rel or "")
         record = {
-            "Detail URL": detail_url,
-            "Position Title": raw_job.get("title", ""),
-            "Company": raw_job.get("company", ""),
-            "Location": raw_job.get("location", ""),
-            "Posting ID": raw_job.get("id", ""),
+            "detail_url": detail_url,
+            "title": raw_job.get("title", ""),
+            "location": raw_job.get("location", ""),
+            "posting_id": raw_job.get("id", ""),
         }
         try:
             self.log("detail:fetch", url=detail_url)

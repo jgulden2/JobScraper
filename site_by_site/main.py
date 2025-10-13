@@ -242,7 +242,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         if rows:
             # gather all existing Location strings (non-empty)
-            loc_strings = [r.get("Location", "") for r in rows if r.get("Location")]
+            loc_strings = [
+                r.get("Raw Location") or r.get("Location", "")
+                for r in rows
+                if r.get("Raw Location") or r.get("Location")
+            ]
             logger = logging.getLogger(__name__)
             n_rows = len(rows)
             n_loc = len(loc_strings)
@@ -265,13 +269,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
             matched = 0
             for r in rows:
-                q = r.get("Location", "")
+                q = r.get("Raw Location") or r.get("Location", "")
                 rec = lookup.get(q)
                 if not rec:
                     continue
-                for k, v in rec.items():
-                    r[k] = v
-                matched += 1
+
+                lat = rec.get("Geo Latitude")
+                lon = rec.get("Geo Longitude")
+                if lat is not None and r.get("Latitude") != lat:
+                    r["Latitude"] = lat
+                if lon is not None and r.get("Longitude") != lon:
+                    r["Longitude"] = lon
+
+                norm_map = {
+                    "Country": rec.get("Geo Country"),
+                    "State": rec.get("Geo State"),
+                    "City": rec.get("Geo City"),
+                    "Postal Code": rec.get("Geo Postcode"),
+                }
+                changed = False
+                for col, val in norm_map.items():
+                    if val and r.get(col) != val:
+                        r[col] = val
+                        changed = True
+                if changed or lat is not None or lon is not None:
+                    matched += 1
+
             new_geo_cols = len([c for c in introduced_cols if c.startswith("Geo ")])
             logger.info(
                 f"geocode:rows:finish matched_rows={matched} unique_lookups={len(lookup)} new_geo_cols={new_geo_cols} time={round(time() - start)} s"

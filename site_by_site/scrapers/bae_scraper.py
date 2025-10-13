@@ -122,11 +122,37 @@ class BAESystemsScraper(JobScraper):
         job_id = job.get("jobId")
         detail_url = f"https://jobs.baesystems.com/global/en/job/{job_id}/"
         artifacts = fetch_detail_artifacts(self.get, self.log, detail_url)
-        if not artifacts:
-            self.log("parse:errors_detail", n=1, reason="detail_empty", job_id=job_id)
+        ph = artifacts.get("_vendor_blob")
+
         return {
-            "title": job.get("title"),
-            "posting_id": job_id,
-            "detail_url": artifacts.get("_canonical_url") or detail_url,
-            "artifacts": artifacts,
+            "Position Title": ph.get("title"),
+            "Detail URL": detail_url,
+            "Description": ph.get("description"),
+            "Post Date": ph.get("postedDate"),
+            "Posting ID": job_id,
+            "US Person Required": ph.get("isUsCitizenshipRequired"),
+            "Clearance Level Must Possess": ph.get("isSecurityClearanceRequired"),
+            "Clearance Level Must Obtain": ph.get("clearenceLevel"),
+            "Relocation Available": ph.get("isRelocationAvailable"),
+            "Salary Raw": ph.get("payRange"),
+            "Salary Min (USD/yr)": ph.get("salaryMin"),
+            "Salary Max (USD/yr)": ph.get("salaryMax"),
+            "Bonus": ph.get("bonus"),
+            "Remote Status": ph.get("physicalLocation"),
+            "Full Time Status": ph.get("structureData").get("employmentType"),
+            "Hours Per Week": ph.get("structureData").get("workHours"),
+            "Travel Percentage": ph.get("travelPercentage"),
+            "Job Category": ph.get("category"),
+            "Business Sector": ph.get("sector"),
+            "Business Area": ph.get("businessArea"),
+            "Industry": ph.get("industry"),
+            "Shift": ph.get("shift"),
+            "Career Level": ph.get("careerLevel"),
+            "Raw Location": ph.get("location"),
+            "Country": ph.get("country"),
+            "State": ph.get("state"),
+            "City": ph.get("city"),
+            "Postal Code": ph.get("postalCode"),
+            "Latitude": ph.get("latitude"),
+            "Longitude": ph.get("longitude"),
         }

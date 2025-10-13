@@ -3,3 +3,4 @@ site_by_site/scrapers/__pycache__
 site_by_site/utils/__pycache__
 site_by_site/scraped_data
 site_by_site/.cache
+site_by_site/testnb.ipynb
