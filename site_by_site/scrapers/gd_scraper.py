@@ -301,7 +301,9 @@ class GeneralDynamicsScraper(JobScraper):
         try:
             self.log("detail:fetch", url=detail_url)
             # Use the unified artifact fetcher (rides this scraper's session)
-            artifacts = fetch_detail_artifacts(self.session.get, self.log, detail_url)
+            artifacts = fetch_detail_artifacts(
+                self.session.get, self.log, detail_url, get_vendor_blob=False
+            )
             html = artifacts.get("_html", "")
             soup = BS(html, "html.parser")
             blocks = extract_bold_block(soup)

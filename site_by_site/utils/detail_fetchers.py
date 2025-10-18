@@ -50,9 +50,10 @@ def fetch_detail_artifacts(
     detail_url: str,
     *,
     timeout: Optional[float] = 30.0,
-    include_jsonld: bool = True,
-    include_meta: bool = True,
-    include_datalayer: bool = True,
+    get_vendor_blob: bool = True,
+    get_jsonld: bool = True,
+    get_meta: bool = True,
+    get_datalayer: bool = True,
 ) -> Dict[str, Any]:
     """
     Fetch a job detail page (HTML) and extract standardized artifacts.
@@ -109,53 +110,54 @@ def fetch_detail_artifacts(
 
     # --- 2) Try to extract vendor-native blobs (preferred -> fallback) ---
     # 2a) phApp.ddo (BAE/RTX/etc.)
-    try:
-        ph = extract_phapp_ddo(html_text)
-    except Exception as e:
-        log("detail:extract:phapp:error", url=detail_url, error=str(e))
-        ph = None
-
-    if isinstance(ph, dict) and ph:
-        # Common paths:
-        #   ph.jobDetail.data.job
-        #   ph.jobDetail.job
-        #   ph.data.job
-        job = (
-            dig(ph, "jobDetail", "data", "job")
-            or dig(ph, "jobDetail", "job")
-            or dig(ph, "data", "job")
-            or ph  # last resort: whole blob
-        )
-        if isinstance(job, dict) and job:
-            bundle["_vendor_blob"] = job
-            log("detail:extract:phapp:ok", url=detail_url)
-
-    # 2b) smartApplyData (Northrop fallback) — only if vendor_blob still empty
-    if bundle["_vendor_blob"] is None:
+    if get_vendor_blob:
         try:
-            smart = extract_smartapply(html_text)
+            ph = extract_phapp_ddo(html_text)
         except Exception as e:
-            log("detail:extract:smartapply:error", url=detail_url, error=str(e))
-            smart = None
+            log("detail:extract:phapp:error", url=detail_url, error=str(e))
+            ph = None
 
-        if isinstance(smart, dict) and smart:
-            bundle["_vendor_blob"] = smart
-            log("detail:extract:smartapply:ok", url=detail_url)
+        if isinstance(ph, dict) and ph:
+            # Common paths:
+            #   ph.jobDetail.data.job
+            #   ph.jobDetail.job
+            #   ph.data.job
+            job = (
+                dig(ph, "jobDetail", "data", "job")
+                or dig(ph, "jobDetail", "job")
+                or dig(ph, "data", "job")
+                or ph  # last resort: whole blob
+            )
+            if isinstance(job, dict) and job:
+                bundle["_vendor_blob"] = job
+                log("detail:extract:phapp:ok", url=detail_url)
+
+        # 2b) smartApplyData (Northrop fallback) — only if vendor_blob still empty
+        if bundle["_vendor_blob"] is None:
+            try:
+                smart = extract_smartapply(html_text)
+            except Exception as e:
+                log("detail:extract:smartapply:error", url=detail_url, error=str(e))
+                smart = None
+
+            if isinstance(smart, dict) and smart:
+                bundle["_vendor_blob"] = smart
+                log("detail:extract:smartapply:ok", url=detail_url)
 
     # --- 3) Optional secondary artifacts (schema/meta/analytics/canonical) ---
-    if include_jsonld:
+    if get_jsonld:
         try:
             bundle["_jsonld"] = strip_prefix_keys(extract_jsonld(soup), "ld.")
         except Exception as e:
             log("detail:extract:jsonld:error", url=detail_url, error=str(e))
 
-    if include_meta:
+    if get_meta:
         try:
             bundle["_meta"] = strip_prefix_keys(extract_meta(soup), "meta.")
         except Exception as e:
             log("detail:extract:meta:error", url=detail_url, error=str(e))
 
-    if include_datalayer:
+    if get_datalayer:
         try:
             bundle["_datalayer"] = extract_datalayer(html_text)
         except Exception as e:

@@ -171,10 +171,10 @@ class NorthropGrummanScraper(JobScraper):
 
         # Minimal identity fields: canonicalizer will populate the rest
         base = {
-            "title": raw_job.get("title", ""),
-            "location": raw_job.get("location", ""),
-            "posting_id": raw_job.get("ats_job_id") or raw_job.get("pid"),
-            "detail_url": raw_job.get("detail_url", ""),
+            "Position Title": raw_job.get("title", ""),
+            "Raw Location": raw_job.get("location", ""),
+            "Posting ID": raw_job.get("ats_job_id") or raw_job.get("pid"),
+            "Detail URL": raw_job.get("detail_url", ""),
         }
 
         # --- Preferred path: detail API
@@ -185,16 +185,24 @@ class NorthropGrummanScraper(JobScraper):
 
         if jr.status_code == 200:
             j = jr.json()
-            return {
-                **base,
-                "artifacts": {"_vendor_blob": j},
-            }
+            base.update(
+                {
+                    "Description": j.get("job_description"),
+                    "Job Category": j.get("department"),
+                    "Business Area": j.get("business_unit"),
+                    "Full Time Status": j.get("custom_JD")
+                    .get("data_fields")
+                    .get("Employment Type")[0],
+                    "Clearance Level Must Possess": j.get("custom_JD")
+                    .get("data_fields")
+                    .get("Clearance Type")[0],
+                }
+            )
 
         if jr.status_code in (404, 405, 410):
             self.log("detail:http_status", kind="api", status=jr.status_code, pid=pid)
-            return base
 
-        # --- Fallback path: HTML detail page
+        # --- HTML detail page
         url = (
             raw_job.get("detail_url")
             or f"https://jobs.northropgrumman.com/careers/job/{pid}"
@@ -206,9 +214,12 @@ class NorthropGrummanScraper(JobScraper):
             (u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment)
         )
 
-        artifacts = fetch_detail_artifacts(self.session.get, self.log, url)
+        artifacts = fetch_detail_artifacts(
+            self.session.get, self.log, url, get_vendor_blob=False
+        )
+        jsonld = artifacts.get("_jsonld") or {}
         return {
             **base,
-            "detail_url": artifacts.get("_canonical_url") or url,
-            "artifacts": artifacts,
+            "Full Time Status": jsonld.get("employmentType"),
+            "Post Date": jsonld.get("datePosted"),
         }

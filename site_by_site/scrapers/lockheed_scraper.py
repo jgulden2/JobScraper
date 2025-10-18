@@ -94,7 +94,9 @@ class LockheedMartinScraper(JobScraper):
         """
         url = job_entry["Detail URL"]
         job_id = job_entry["Posting ID"]
-        artifacts = fetch_detail_artifacts(self.get, self.log, url)
+        artifacts = fetch_detail_artifacts(
+            self.get, self.log, url, get_vendor_blob=False
+        )
         jsonld = artifacts.get("_jsonld")
         meta = artifacts.get("_meta")
         soup = BS(artifacts.get("_html"), "html.parser")
