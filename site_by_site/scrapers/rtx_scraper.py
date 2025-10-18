@@ -172,10 +172,27 @@ class RTXScraper(JobScraper):
         job_id = raw_job.get("jobId")
         detail_url = self.job_detail_url_template.format(job_id=job_id)
         artifacts = fetch_detail_artifacts(self.get, self.log, detail_url)
+        jsonld = artifacts.get("_jsonld")
+        phapp = artifacts.get("_vendor_blob")
         return {
-            "title": raw_job.get("title"),
-            "location": raw_job.get("cityStateCountry"),
-            "posting_id": job_id,
-            "detail_url": artifacts.get("_canonical_url") or detail_url,
-            "artifacts": artifacts,
+            "Position Title": raw_job.get("title"),
+            "Description": jsonld.get("description"),
+            "Raw Location": raw_job.get("address") or raw_job.get("location"),
+            "Posting ID": job_id,
+            "Detail URL": artifacts.get("_canonical_url") or detail_url,
+            "Full Time Status": raw_job.get("type"),
+            "Remote Status": raw_job.get("locationType"),
+            "State": raw_job.get("state"),
+            "City": raw_job.get("city"),
+            "Latitude": raw_job.get("latitude"),
+            "Longitude": raw_job.get("longitude"),
+            "Career Level": raw_job.get("experienceLevel"),
+            "Country": raw_job.get("country"),
+            "Post Date": raw_job.get("postedDate"),
+            "Job Category": raw_job.get("category"),
+            "Postal Code": jsonld.get("jobLocation.0.address.postalCode"),
+            "Hours Per Week": jsonld.get("workHours"),
+            "Business Area": phapp.get("businessUnit"),
+            "Relocation Available": phapp.get("relocationEligible"),
+            "Clearance Level Must Possess": phapp.get("clearanceType"),
         }
