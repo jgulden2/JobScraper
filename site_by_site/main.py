@@ -209,6 +209,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "If used without a value, defaults to scraped_data/all_full.csv."
         ),
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Max worker threads for detail parsing (default: auto ~12).",
+    )
     return parser.parse_args(argv)
 
 
@@ -242,6 +248,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         s = run_scraper(scraper_name, testing=args.testing)
         s.testing = testing
         s.test_limit = test_limit
+        if args.workers:
+            # not all scrapers expose this attr, but our base class does
+            setattr(s, "max_workers", max(1, int(args.workers)))
         if s is not None:
             ran.append(s)
 

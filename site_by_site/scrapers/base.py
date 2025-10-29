@@ -16,12 +16,16 @@ from __future__ import annotations
 
 import logging
 import requests
+import threading
+
+import pandas as pd
+
 from time import time
 from requests.adapters import HTTPAdapter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib3.util.retry import Retry
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
 from utils.schema import CANON_COLUMNS
 from utils.canonicalize import canonicalize_record
 
@@ -82,6 +86,49 @@ class JobScraper:
         self.session = self.build_session_with_retries()
         self.write_full_also = True
         self.jobs_full: List[dict] = []
+
+        # --- concurrency knobs ---
+        self.max_workers: int = 12  # good default for I/O; override per-scraper/CLI
+        self._thread_local = threading.local()
+
+    # ------------------------------------------------------------------
+    # Thread-local requests.Session to keep sessions safe across threads
+    # ------------------------------------------------------------------
+    def _get_thread_session(self) -> requests.Session:
+        s = getattr(self._thread_local, "session", None)
+        if s is not None:
+            return s
+        s = requests.Session()
+        s.headers.update(self.headers or {})
+        # same retry policy as build_session_with_retries()
+        retry = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            status=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "POST"}),
+            raise_on_status=False,
+            respect_retry_after_header=True,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        setattr(self._thread_local, "session", s)
+        return s
+
+    def thread_get(self, url: str, **kwargs: Any) -> requests.Response:
+        """
+        GET using a thread-local requests.Session (safe under a ThreadPool).
+        Mirrors self.get(...) behavior but isolates sockets/cookies per thread.
+        """
+        headers = {**(self.headers or {}), **(kwargs.pop("headers", {}) or {})}
+        params = {**(self.params or {}), **(kwargs.pop("params", {}) or {})}
+        timeout = kwargs.pop("timeout", self.default_timeout)
+        return self._get_thread_session().get(
+            url, headers=headers, params=params, timeout=timeout, **kwargs
+        )
 
     def fmt_pairs(self, **kv: Any) -> str:
         """
@@ -367,31 +414,40 @@ class JobScraper:
         self.log("parse:start", total=len(data))
         parsed_min: List[Dict[str, Any]] = []
         parsed_full: List[Dict[str, Any]] = []
-
         vendor_name = self.__class__.__name__.replace("Scraper", "")
 
-        for idx, raw in enumerate(data, 1):
-            try:
-                rec = self.parse_job(raw)
+        # -------------------------
+        # Parallelize parse_job()
+        # -------------------------
+        self.log("parse:pool:start", workers=self.max_workers, total=len(data))
+
+        def _do_parse(raw_item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            # Keep parse_job untouched; it may call self.thread_get where needed.
+            return self.parse_job(raw_item)
+
+        idx = 0
+        with ThreadPoolExecutor(max_workers=self.max_workers) as ex:
+            futures = [ex.submit(_do_parse, r) for r in data]
+            for fut in as_completed(futures):
+                try:
+                    rec = fut.result()
+                except Exception:
+                    errors += 1
+                    self.logger.exception("parse:error")
+                    continue
                 if not rec:
                     continue
-
+                idx += 1
                 artifacts = rec.pop("artifacts", None)
-
                 full_row = {"Vendor": vendor_name, **rec}
                 if artifacts:
                     full_row["_artifacts"] = artifacts
-
                 canon_row = canonicalize_record(vendor=vendor_name, raw=rec)
-
                 parsed_full.append(full_row)
                 parsed_min.append({k: canon_row.get(k, "") for k in CANON_COLUMNS})
-
                 if idx == 1 or idx % self.log_every == 0:
                     self.log("parse:progress", idx=idx, total=len(data))
-            except Exception:
-                errors += 1
-                self.logger.exception("parse:error")
+        self.log("parse:pool:done", parsed=len(parsed_min))
 
         # De-duplicate both views using the same keys
         parsed_min = self.dedupe_records(parsed_min)
