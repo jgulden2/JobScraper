@@ -117,7 +117,7 @@ def sanitize_description(raw: Optional[str]) -> str:
         .replace("<BR/>", "<br>")
         .replace("<BR>", "<br>")
     )
-    soup = BS(s, "html.parser")
+    soup = BS(s, "lxml")
     for tag in soup.find_all(["script", "style"]):
         tag.decompose()
     # turn structural blocks into line breaks so content stays readable

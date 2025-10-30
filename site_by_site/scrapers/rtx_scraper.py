@@ -171,7 +171,13 @@ class RTXScraper(JobScraper):
         """
         job_id = raw_job.get("jobId")
         detail_url = self.job_detail_url_template.format(job_id=job_id)
-        artifacts = fetch_detail_artifacts(self.thread_get, self.log, detail_url)
+        artifacts = fetch_detail_artifacts(
+            self.thread_get,
+            self.log,
+            detail_url,
+            get_datalayer=False,
+            get_meta=False,
+        )
         jsonld = artifacts.get("_jsonld")
         phapp = artifacts.get("_vendor_blob")
         return {

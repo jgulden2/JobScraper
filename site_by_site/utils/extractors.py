@@ -128,7 +128,7 @@ def extract_datalayer(html: str) -> Dict[str, str]:
 
 
 def extract_canonical_link(html_text: str) -> Optional[str]:
-    soup = BS(html_text, "html.parser")
+    soup = BS(html_text, "lxml")
     link = soup.find("link", rel=lambda v: v and "canonical" in v.lower())
     return link.get("href") if link and link.has_attr("href") else None
 
@@ -184,7 +184,7 @@ def extract_smartapply(html_text: str) -> Dict[str, Any]:
         json.JSONDecodeError: If the embedded JSON block cannot be decoded.
         ValueError: If the expected container is present but contains invalid JSON.
     """
-    soup = BS(html_text, "html.parser")
+    soup = BS(html_text, "lxml")
     code = soup.select_one("#smartApplyData")
     if not code:
         return {}
@@ -211,7 +211,7 @@ def text(node: Any) -> str:
     Raises:
         None
     """
-    return BS(str(node), "html.parser").get_text(" ", strip=True)
+    return BS(str(node), "lxml").get_text(" ", strip=True)
 
 
 def collect_until_next_b(start_b: Any) -> str:

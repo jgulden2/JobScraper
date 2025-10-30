@@ -95,11 +95,11 @@ class LockheedMartinScraper(JobScraper):
         url = job_entry["Detail URL"]
         job_id = job_entry["Posting ID"]
         artifacts = fetch_detail_artifacts(
-            self.thread_get, self.log, url, get_vendor_blob=False
+            self.thread_get, self.log, url, get_vendor_blob=False, get_datalayer=False
         )
         jsonld = artifacts.get("_jsonld")
         meta = artifacts.get("_meta")
-        soup = BS(artifacts.get("_html"), "html.parser")
+        soup = BS(artifacts.get("_html"), "lxml")
         blocks = extract_bold_block(soup)
         return {
             "Posting ID": job_id,
@@ -135,7 +135,7 @@ class LockheedMartinScraper(JobScraper):
         """
         response = self.get(self.SEARCH_URL)
         response.raise_for_status()
-        soup = BS(response.text, "html.parser")
+        soup = BS(response.text, "lxml")
         pagination = soup.select_one("section#search-results")
         if not pagination:
             return 1
@@ -162,7 +162,7 @@ class LockheedMartinScraper(JobScraper):
         response = self.get(page_url)
         response.raise_for_status()
 
-        soup = BS(response.text, "html.parser")
+        soup = BS(response.text, "lxml")
         job_links: List[Dict[str, str]] = []
 
         for link in soup.select("section#search-results-list a[data-job-id]"):

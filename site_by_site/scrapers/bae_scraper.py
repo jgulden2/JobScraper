@@ -108,7 +108,14 @@ class BAESystemsScraper(JobScraper):
         """
         job_id = job.get("jobId")
         detail_url = f"https://jobs.baesystems.com/global/en/job/{job_id}/"
-        artifacts = fetch_detail_artifacts(self.thread_get, self.log, detail_url)
+        artifacts = fetch_detail_artifacts(
+            self.thread_get,
+            self.log,
+            detail_url,
+            get_jsonld=False,
+            get_meta=False,
+            get_datalayer=False,
+        )
         ph = artifacts.get("_vendor_blob")
 
         return {

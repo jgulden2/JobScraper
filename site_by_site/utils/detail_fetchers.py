@@ -100,7 +100,7 @@ def fetch_detail_artifacts(
     resp.raise_for_status()
     html_text = resp.text
 
-    soup = BS(html_text, "html.parser")
+    soup = BS(html_text, "lxml")
 
     bundle: Dict[str, Any] = {
         "detail_url": detail_url,

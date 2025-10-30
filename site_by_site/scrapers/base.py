@@ -81,14 +81,14 @@ class JobScraper:
         )
         self.log_every = 25
         # Default per-request timeout (seconds) if caller doesn't supply one
-        self.default_timeout = 30.0
+        self.default_timeout = 10.0
         # Shared requests.Session with retry/backoff enabled
         self.session = self.build_session_with_retries()
         self.write_full_also = True
         self.jobs_full: List[dict] = []
 
         # --- concurrency knobs ---
-        self.max_workers: int = 12  # good default for I/O; override per-scraper/CLI
+        self.max_workers: int = 24  # good default for I/O; override per-scraper/CLI
         self._thread_local = threading.local()
 
     # ------------------------------------------------------------------
