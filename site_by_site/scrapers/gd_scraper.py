@@ -17,6 +17,7 @@ from time import time
 from math import ceil
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode, urlunparse, urljoin
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from bs4 import BeautifulSoup as BS
@@ -151,42 +152,37 @@ class GeneralDynamicsScraper(JobScraper):
         page_size = 200
         use_facet = True
         jobs: List[Dict[str, Any]] = []
-        total: Optional[int] = None
-        max_pages: Optional[int] = None
-        page = 0
         fetched = 0
         target = 40 if self.testing else 10**12
         start_time = time()
 
-        while True:
-            if use_facet:
-                payload = {
-                    "address": [],
-                    "facets": [
+        def make_payload(p: int, ps: int, facet: bool) -> Dict[str, Any]:
+            return {
+                "address": [],
+                "facets": (
+                    [
                         {
                             "name": "career_page_size",
                             "values": [{"value": "200 Jobs Per Page"}],
                         }
-                    ],
-                    "page": page,
-                    "pageSize": page_size,
-                    "what": "",
-                    "usedPlacesApi": False,
-                }
-            else:
-                payload = {
-                    "address": [],
-                    "facets": [],
-                    "page": page,
-                    "pageSize": page_size,
-                    "what": "",
-                    "usedPlacesApi": False,
-                }
-            token = b64url_encode(payload)
+                    ]
+                    if facet
+                    else []
+                ),
+                "page": p,
+                "pageSize": ps,
+                "what": "",
+                "usedPlacesApi": False,
+            }
+
+        # ---- Step 1: learn a stable mode on page 0 (facet / page_size) ----
+        page0_data: Optional[Dict[str, Any]] = None
+        while True:
             try:
-                data, _ = self.call_api(token)
+                tok0 = b64url_encode(make_payload(0, page_size, use_facet))
+                page0_data, _ = self.call_api(tok0)
+                break
             except requests.HTTPError as e:
-                # The API sometimes returns 400 for facet/page size combos; downgrade
                 if e.response is not None and e.response.status_code == 400:
                     if use_facet:
                         use_facet = False
@@ -198,10 +194,7 @@ class GeneralDynamicsScraper(JobScraper):
                         )
                         continue
                     if page_size > 100:
-                        offset = fetched
                         page_size = 100
-                        page = offset // page_size
-                        max_pages = None
                         self.log(
                             "api:retry_mode",
                             reason="400",
@@ -209,64 +202,130 @@ class GeneralDynamicsScraper(JobScraper):
                             page_size=page_size,
                         )
                         continue
-                    break
                 raise
 
-            if total is None:
-                total = int(data.get("ResultTotal") or 0)
-                self.log("source:total", total=total)
+        total = int(page0_data.get("ResultTotal") or 0)
+        self.log("source:total", total=total)
 
-            if max_pages is None:
-                pc = data.get("PageCount")
-                pc = (
-                    int(pc)
-                    if isinstance(pc, int) or (isinstance(pc, str) and pc.isdigit())
-                    else 0
-                )
-                calc = ceil(total / page_size) if total else 0
-                if pc and calc:
-                    max_pages = min(pc, calc)
-                else:
-                    max_pages = pc or calc or None
+        pc = page0_data.get("PageCount")
+        pc_int = (
+            int(pc)
+            if isinstance(pc, int) or (isinstance(pc, str) and pc.isdigit())
+            else 0
+        )
+        calc = ceil(total / page_size) if total else 0
+        max_pages = min(pc_int, calc) if (pc_int and calc) else (pc_int or calc or 1)
 
-            results = data.get("Results") or []
-            self.log("list:page", page=page, page_size=page_size, got=len(results))
-
-            for item in results:
-                link = (item.get("Link") or {}).get("Url")
-                if link:
-                    loc0 = ((item.get("Locations") or [{}])[0]) or {}
-                    workplace_options = item.get("WorkplaceOptions") or []
-                    jobs.append(
-                        {
-                            "Detail URL": link,
-                            "Posting ID": item.get("ReferenceCode"),
-                            "Full Time Status": ", ".join(item.get("EmploymentTypes")),
-                            "Job Category": item.get("Category"),
-                            "Clearance Level Must Possess": item.get("Clearance"),
-                            "Position Title": item.get("Title"),
-                            "Post Date": item.get("Date"),
-                            "Country": loc0.get("Country"),
-                            "State": loc0.get("State"),
-                            "Latitude": loc0.get("Latitude"),
-                            "Longitude": loc0.get("Longitude"),
-                            "Business Area": item.get("Company"),
-                            "Raw Location": loc0.get("Name"),
-                            "Remote Status": ""
-                            if len(workplace_options) == 0
-                            else ", ".join(workplace_options),
-                        }
-                    )
-                    fetched += 1
-                    if fetched >= target:
-                        break
-
+        # ---- Collect page 0 results ----
+        results0 = page0_data.get("Results") or []
+        self.log("list:page", page=0, page_size=page_size, got=len(results0))
+        for item in results0:
+            link = (item.get("Link") or {}).get("Url")
+            if not link:
+                continue
+            loc0 = ((item.get("Locations") or [{}])[0]) or {}
+            workplace_options = item.get("WorkplaceOptions") or []
+            jobs.append(
+                {
+                    "Detail URL": link,
+                    "Posting ID": item.get("ReferenceCode"),
+                    "Full Time Status": ", ".join(item.get("EmploymentTypes")),
+                    "Job Category": item.get("Category"),
+                    "Clearance Level Must Possess": item.get("Clearance"),
+                    "Position Title": item.get("Title"),
+                    "Post Date": item.get("Date"),
+                    "Country": loc0.get("Country"),
+                    "State": loc0.get("State"),
+                    "Latitude": loc0.get("Latitude"),
+                    "Longitude": loc0.get("Longitude"),
+                    "Business Area": item.get("Company"),
+                    "Raw Location": loc0.get("Name"),
+                    "Remote Status": ""
+                    if len(workplace_options) == 0
+                    else ", ".join(workplace_options),
+                }
+            )
+            fetched += 1
             if fetched >= target:
                 break
-            page += 1
-            if max_pages is not None and page >= max_pages:
-                break
-            if not results:
+
+        if fetched >= target or max_pages <= 1:
+            dur = time() - start_time
+            self.log("list:fetched", count=len(jobs))
+            self.log("run:segment", segment="gd.fetch_data", seconds=round(dur, 3))
+            return jobs
+
+        # ---- Step 2: fan out pages 1..N-1 concurrently under the learned mode ----
+        list_workers = getattr(self, "list_workers", 6)
+
+        def fetch_page(p: int) -> List[Dict[str, Any]]:
+            token = b64url_encode(make_payload(p, page_size, use_facet))
+            data, _ = self.call_api(token)
+            self.log(
+                "list:page",
+                page=p,
+                page_size=page_size,
+                got=len(data.get("Results") or []),
+            )
+            return data.get("Results") or []
+
+        futures = {}
+        with ThreadPoolExecutor(max_workers=list_workers) as ex:
+            for p in range(1, max_pages):
+                futures[ex.submit(fetch_page, p)] = p
+
+            # preserve deterministic order by staging in an array
+            page_results: List[Optional[List[Dict[str, Any]]]] = [None] * (
+                max_pages - 1
+            )
+            for fut in as_completed(futures):
+                p = futures[fut]
+                try:
+                    page_results[p - 1] = fut.result()
+                except Exception:
+                    # log but keep going
+                    self.log(
+                        "api:page_error",
+                        level="warning",
+                        page=p,
+                        error=format_exc(),
+                        use_facet=use_facet,
+                        page_size=page_size,
+                    )
+
+        for res in page_results:
+            if not res:
+                continue
+            for item in res:
+                if fetched >= target:
+                    break
+                link = (item.get("Link") or {}).get("Url")
+                if not link:
+                    continue
+                loc0 = ((item.get("Locations") or [{}])[0]) or {}
+                workplace_options = item.get("WorkplaceOptions") or []
+                jobs.append(
+                    {
+                        "Detail URL": link,
+                        "Posting ID": item.get("ReferenceCode"),
+                        "Full Time Status": ", ".join(item.get("EmploymentTypes")),
+                        "Job Category": item.get("Category"),
+                        "Clearance Level Must Possess": item.get("Clearance"),
+                        "Position Title": item.get("Title"),
+                        "Post Date": item.get("Date"),
+                        "Country": loc0.get("Country"),
+                        "State": loc0.get("State"),
+                        "Latitude": loc0.get("Latitude"),
+                        "Longitude": loc0.get("Longitude"),
+                        "Business Area": item.get("Company"),
+                        "Raw Location": loc0.get("Name"),
+                        "Remote Status": ""
+                        if len(workplace_options) == 0
+                        else ", ".join(workplace_options),
+                    }
+                )
+                fetched += 1
+            if fetched >= target:
                 break
 
         dur = time() - start_time
@@ -302,10 +361,16 @@ class GeneralDynamicsScraper(JobScraper):
             self.log("detail:fetch", url=detail_url)
             # Use the unified artifact fetcher (rides this scraper's session)
             artifacts = fetch_detail_artifacts(
-                self.session.get, self.log, detail_url, get_vendor_blob=False
+                self.thread_get,
+                self.log,
+                detail_url,
+                get_vendor_blob=False,
+                get_jsonld=False,
+                get_meta=False,
+                get_datalayer=False,
             )
             html = artifacts.get("_html", "")
-            soup = BS(html, "html.parser")
+            soup = BS(html, "lxml")
             blocks = extract_bold_block(soup)
 
             desc = "; ".join(blocks.values())
