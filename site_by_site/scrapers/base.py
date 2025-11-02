@@ -418,6 +418,9 @@ class JobScraper:
                 self.log("limit:per_scraper", limit=cap)
                 data = data[:cap]
 
+        # Record how many items will be parsed (pre-dedupe), so global budgeting
+        # can consume by the assigned/kept count rather than the final deduped size.
+        self._kept_count = len(data)
         self.log("fetch:done", n=len(data))
 
         self.log("parse:start", total=len(data))

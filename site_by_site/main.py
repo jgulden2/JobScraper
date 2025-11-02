@@ -257,12 +257,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     configure_logging(args.logfile, args.suppress)
 
     # ---------- Normalize modes & caps ----------
-    # We want --limit to behave like testing (early-stop in fetch paths),
-    # just with a different cap value.
+    # We want --limit **and** --limit-global to behave like testing (early-stop in fetch paths),
+    # just with different cap semantics.
     testing_raw = args.testing
     testing_cli = isinstance(testing_raw, str) and testing_raw.lower() != "false"
 
-    # testing_like covers either explicit --testing, OR --limit without --testing
+    # testing_like covers:
+    #   - explicit --testing, OR
+    #   - --limit without --testing, OR
+    #   - --limit-global without either of the above (so we still early-stop during fetch)
     testing_like: bool
     per_scraper_cap: int | None
     if testing_cli:
@@ -275,16 +278,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         testing_like = True
         per_scraper_cap = int(args.limit)
     else:
-        testing_like = False
+        testing_like = args.limit_global is not None
         per_scraper_cap = None
 
     # Global cap (overall ceiling). Independent of per-scraper cap.
-    global_cap = (
-        int(args["limit_global"])
-        if isinstance(getattr(args, "limit_global", None), str)
-        else args.limit_global
-    )
-    # The above line gracefully handles argparse’s types; net-net: global_cap is int|None.
+    # Argparse already typed this as int|None.
+    global_cap = args.limit_global
 
     # Run selected scrapers (or all if none specified) and keep handles.
     to_run = list(args.scrapers or SCRAPER_MAPPING.keys())
@@ -339,7 +338,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             eff_cap = int(min(per_scraper_cap, rem))  # both present
 
         # IMPORTANT: pass a real bool to run_scraper and drive test_limit.
-        # This triggers the same "testing" early-stop logic inside scrapers (e.g., BAE)
+        # This triggers the same "testing" early-stop logic inside scrapers (e.g., BAE/Lockheed/RTX/GD/Northrop)
         # so pagination halts once eff_cap is hit during fetch, not after.
         s = run_scraper(
             scraper_name,
@@ -357,9 +356,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         # Consume from the global budget (if present)
         if budget.remaining() is not None:
-            produced = len(getattr(s, "jobs", []) or [])
-            if produced:
-                budget.take(produced)
+            # Prefer the number we *kept before dedupe* (what we assigned to this scraper),
+            # falling back to canonical count if not available.
+            kept = getattr(s, "_kept_count", None)
+            consume = (
+                int(kept) if kept is not None else len(getattr(s, "jobs", []) or [])
+            )
+            if consume:
+                budget.take(consume)
             if budget.exhausted():
                 break
 
