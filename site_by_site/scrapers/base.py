@@ -212,17 +212,48 @@ class JobScraper:
             A list with duplicates removed based on 'Posting ID' if present,
             otherwise 'Detail URL' or 'Position Title' as a fallback key.
         """
-        seen: set[str] = set()
+        # Track which canonical record "won" for each key so we can emit
+        # (winner, duplicate) pairs for audit/review later.
+        seen: Dict[str, Dict[str, Any]] = {}
         out: List[Dict[str, Any]] = []
+        pairs: List[Dict[str, Any]] = []
         for r in records:
             k = r.get("Posting ID") or r.get("Detail URL") or r.get("Position Title")
             if not k:
                 out.append(r)
                 continue
             if k in seen:
+                winner = seen[k]
+                # Emit a structured log entry (handy if you tail logs),
+                # and also keep an in-memory pair for later export.
+                self.log(
+                    "dedupe:drop",
+                    key=k,
+                    kept_posting=winner.get("Posting ID"),
+                    kept_url=winner.get("Detail URL"),
+                    kept_title=winner.get("Position Title"),
+                    drop_posting=r.get("Posting ID"),
+                    drop_url=r.get("Detail URL"),
+                    drop_title=r.get("Position Title"),
+                )
+                pairs.append(
+                    {
+                        "Key": k,
+                        "Kept Posting ID": winner.get("Posting ID"),
+                        "Kept Detail URL": winner.get("Detail URL"),
+                        "Kept Title": winner.get("Position Title"),
+                        "Dropped Posting ID": r.get("Posting ID"),
+                        "Dropped Detail URL": r.get("Detail URL"),
+                        "Dropped Title": r.get("Position Title"),
+                    }
+                )
                 continue
-            seen.add(k)
+            seen[k] = r
             out.append(r)
+
+        # Expose the pairs so the CLI can optionally write a CSV later
+        self._dedupe_pairs = pairs
+        self.log("dedupe_records:unique", n=len(out))
         return out
 
     # -----------------------------
@@ -469,7 +500,6 @@ class JobScraper:
 
         self.jobs = parsed_min
 
-        self.log("dedupe_records:unique", n=len(self.jobs))
         self.log("done", count=len(self.jobs))
         self.log("parse:errors", n=errors)
         self.log("run:duration", seconds=round(time() - start, 3))

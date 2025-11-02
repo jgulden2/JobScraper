@@ -53,6 +53,7 @@ class BAESystemsScraper(JobScraper):
                 missing or invalid.
         """
         all_jobs: List[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
         offset = 0
         page_size = 10
         if getattr(self, "testing", False):
@@ -90,7 +91,28 @@ class BAESystemsScraper(JobScraper):
                 self.log("list:done", reason="empty")
                 break
 
-            all_jobs.extend(jobs)
+            seen_ids = {x.get("jobId") for x in all_jobs}
+            repeats = [j.get("jobId") for j in jobs if j.get("jobId") in seen_ids]
+            if repeats:
+                self.log("list:dup_ids", offset=offset, ids=",".join(map(str, repeats)))
+            # De-dupe at listing time to avoid overlapping-page repeats
+            added = 0
+            for j in jobs:
+                jid = str(j.get("jobId") or "")
+                if not jid:
+                    all_jobs.append(j)  # keep nonstandard items just in case
+                    added += 1
+                    continue
+                if jid in seen_ids:
+                    # optional: log for visibility
+                    self.log("list:dup", offset=offset, jobId=jid)
+                    continue
+                seen_ids.add(jid)
+                all_jobs.append(j)
+                added += 1
+            self.log(
+                "list:added_unique", offset=offset, added=added, total=len(all_jobs)
+            )
             self.log("list:fetched", count=len(jobs), offset=offset)
             offset += page_size
 

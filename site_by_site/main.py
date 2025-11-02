@@ -370,10 +370,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Optionally write one combined FULL canonical CSV across all scrapers.
     if args.combine_full:
         rows: list[dict] = []
+        # Also gather all dedupe pairs across scrapers (if any)
+        dedupe_rows: list[dict] = []
         for s in ran:
             jf = getattr(s, "jobs_full", None)
             if isinstance(jf, list) and jf:
                 rows.extend(jf)
+            pairs = getattr(s, "_dedupe_pairs", None)
+            if pairs:
+                # Tag each row with the scraper name for easier triage
+                for pr in pairs:
+                    pr = dict(pr)
+                    pr["Scraper"] = getattr(s, "name", s.__class__.__name__)
+                    dedupe_rows.append(pr)
 
         if rows:
             # gather all existing Location strings (non-empty)
@@ -446,6 +455,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "export:combined_full",
                 extra={"scraper": "", "path": str(out_path), "n": len(rows)},
             )
+            # If we observed any duplicates, write a sibling dedupe report
+            if dedupe_rows:
+                dedupe_path = (
+                    out_path.with_suffix("")
+                    .with_suffix(out_path.suffix)
+                    .with_name(out_path.stem + ".dedupe.csv")
+                )
+                try:
+                    pd.DataFrame(dedupe_rows).to_csv(dedupe_path, index=False)
+                    logging.getLogger(__name__).info(
+                        "export:dedupe_report",
+                        extra={
+                            "scraper": "",
+                            "path": str(dedupe_path),
+                            "n": len(dedupe_rows),
+                        },
+                    )
+                except Exception:
+                    logging.getLogger(__name__).exception("export:dedupe_report_error")
         else:
             logging.getLogger(__name__).info(
                 "export:combined_full:empty",
