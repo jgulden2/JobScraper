@@ -408,6 +408,15 @@ class JobScraper:
             # Central, consistent testing enforcement + message
             self.log("testing:limit", limit=self.test_limit)
             data = data[: self.test_limit]
+        elif getattr(self, "limit_per_scraper", None):
+            # Non-testing per-scraper cap (driven by --limit)
+            try:
+                cap = int(getattr(self, "limit_per_scraper"))
+            except Exception:
+                cap = None
+            if cap is not None and cap > 0:
+                self.log("limit:per_scraper", limit=cap)
+                data = data[:cap]
 
         self.log("fetch:done", n=len(data))
 

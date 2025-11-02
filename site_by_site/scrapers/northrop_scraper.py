@@ -85,7 +85,10 @@ class NorthropGrummanScraper(JobScraper):
 
         if getattr(self, "testing", False):
             num = 25
-            max_jobs = 40
+            try:
+                max_jobs = int(getattr(self, "test_limit", 40)) or 0
+            except Exception:
+                max_jobs = 40
 
         jobs: List[Dict[str, Any]] = []
         total_count: Optional[int] = None

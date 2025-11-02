@@ -153,7 +153,13 @@ class GeneralDynamicsScraper(JobScraper):
         use_facet = True
         jobs: List[Dict[str, Any]] = []
         fetched = 0
-        target = 40 if self.testing else 10**12
+        if getattr(self, "testing", False):
+            try:
+                target = int(getattr(self, "test_limit", 40)) or 0
+            except Exception:
+                target = 40
+        else:
+            target = 10**12
         start_time = time()
 
         def make_payload(p: int, ps: int, facet: bool) -> Dict[str, Any]:

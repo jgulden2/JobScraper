@@ -55,7 +55,13 @@ class BAESystemsScraper(JobScraper):
         all_jobs: List[Dict[str, Any]] = []
         offset = 0
         page_size = 10
-        job_limit = 15 if getattr(self, "testing", False) else float("inf")  # type: ignore[assignment]
+        if getattr(self, "testing", False):
+            try:
+                job_limit = int(getattr(self, "test_limit", 15)) or 0
+            except Exception:
+                job_limit = 15
+        else:
+            job_limit = float("inf")
 
         first_page_url = f"{self.base_url}?from={offset}&s=1"
         response = self.get(first_page_url)

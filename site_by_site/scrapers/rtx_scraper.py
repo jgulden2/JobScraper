@@ -86,7 +86,13 @@ class RTXScraper(JobScraper):
             requests.RequestException: If network communication fails.
             ValueError: If the `phApp.ddo` data cannot be found or parsed.
         """
-        job_limit = 15 if getattr(self, "testing", False) else float("inf")
+        if getattr(self, "testing", False):
+            try:
+                job_limit = int(getattr(self, "test_limit", 15)) or 0
+            except Exception:
+                job_limit = 15
+        else:
+            job_limit = float("inf")
         all_jobs: List[Dict[str, Any]] = []
         offset = 0
 

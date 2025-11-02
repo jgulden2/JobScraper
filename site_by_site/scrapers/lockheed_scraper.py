@@ -67,11 +67,17 @@ class LockheedMartinScraper(JobScraper):
         total_pages = self.get_total_pages()
         self.log("list:pages", total_pages=total_pages)
 
-        job_limit = 15 if getattr(self, "testing", False) else float("inf")  # type: ignore[assignment]
         if getattr(self, "testing", False):
-            total_pages = 1
-        elif self.max_pages:
-            total_pages = min(total_pages, self.max_pages)
+            try:
+                job_limit = int(getattr(self, "test_limit", 15)) or 0
+            except Exception:
+                job_limit = 15
+            # Do NOT force total_pages=1; let the loop paginate until job_limit is reached.
+            # This keeps default 15 fast, and allows values >15 (e.g., --limit 20) to span pages.
+        else:
+            job_limit = float("inf")  # type: ignore[assignment]
+            if self.max_pages:
+                total_pages = min(total_pages, self.max_pages)
 
         all_job_links: List[Dict[str, str]] = []
         for page_num in range(1, total_pages + 1):
@@ -84,6 +90,9 @@ class LockheedMartinScraper(JobScraper):
                 all_job_links.append(link)
 
             sleep(self.delay)
+            # If we hit the cap inside this page, stop paging.
+            if len(all_job_links) >= job_limit:
+                break
 
         self.log("list:done", reason="end")
         return all_job_links

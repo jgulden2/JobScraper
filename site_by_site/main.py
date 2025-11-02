@@ -118,6 +118,7 @@ def run_scraper(
     scraper_name: str,
     testing: bool = False,
     registry: Mapping[str, Type[ScraperProtocol]] = SCRAPER_MAPPING,
+    test_limit: int | None = None,
 ) -> ScraperProtocol | None:
     """
     Run a single scraper end-to-end and export its results.
@@ -146,6 +147,12 @@ def run_scraper(
     print(f"Running {scraper_name} scraper... (testing={testing})")
     scraper: ScraperProtocol = scraper_class()
     scraper.testing = testing
+    if test_limit is not None:
+        # honor a caller-specified cap (used for global budget)
+        try:
+            scraper.test_limit = int(test_limit)
+        except Exception:
+            scraper.test_limit = None
 
     # Ensure export destination exists.
     out_dir = Path("scraped_data")
@@ -215,6 +222,24 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=None,
         help="Max worker threads for detail parsing (default: auto ~12).",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=(
+            "Cap the number of jobs PER SCRAPER (does not enable testing). "
+            "Behaves like --testing's per-scraper limit but without toggling testing."
+        ),
+    )
+    parser.add_argument(
+        "--limit-global",
+        type=int,
+        default=None,
+        help=(
+            "Cap the TOTAL number of jobs across ALL selected scrapers. "
+            "If combined with --testing/--limit, this is an overall ceiling."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -231,28 +256,112 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
 
-    if args.testing.lower() == "false":
-        testing = False
-        test_limit = None
-    else:
-        testing = True
+    # ---------- Normalize modes & caps ----------
+    # We want --limit to behave like testing (early-stop in fetch paths),
+    # just with a different cap value.
+    testing_raw = args.testing
+    testing_cli = isinstance(testing_raw, str) and testing_raw.lower() != "false"
+
+    # testing_like covers either explicit --testing, OR --limit without --testing
+    testing_like: bool
+    per_scraper_cap: int | None
+    if testing_cli:
+        testing_like = True
         try:
-            test_limit = int(args.testing)
+            per_scraper_cap = int(testing_raw)
         except ValueError:
-            test_limit = None
+            per_scraper_cap = int(args.limit) if args.limit is not None else 15
+    elif args.limit is not None:
+        testing_like = True
+        per_scraper_cap = int(args.limit)
+    else:
+        testing_like = False
+        per_scraper_cap = None
+
+    # Global cap (overall ceiling). Independent of per-scraper cap.
+    global_cap = (
+        int(args["limit_global"])
+        if isinstance(getattr(args, "limit_global", None), str)
+        else args.limit_global
+    )
+    # The above line gracefully handles argparse’s types; net-net: global_cap is int|None.
 
     # Run selected scrapers (or all if none specified) and keep handles.
     to_run = list(args.scrapers or SCRAPER_MAPPING.keys())
     ran: list[ScraperProtocol] = []
+
+    # Tiny, thread-safe global budget (if requested)
+    class GlobalBudget:
+        def __init__(self, cap):
+            import threading
+
+            self._cap = cap
+            self._lock = threading.Lock()
+
+        def remaining(self):
+            return self._cap
+
+        def take(self, n):
+            if self._cap is None:
+                return n
+            with self._lock:
+                allowed = max(0, min(n, self._cap))
+                self._cap -= allowed
+                return allowed
+
+        def exhausted(self):
+            return self._cap is not None and self._cap <= 0
+
+    budget = GlobalBudget(global_cap)
+
     for scraper_name in to_run:
-        s = run_scraper(scraper_name, testing=args.testing)
-        s.testing = testing
-        s.test_limit = test_limit
+        if budget.exhausted():
+            logging.getLogger(__name__).info(
+                "global_cap:exhausted:skip_remaining",
+                extra={
+                    "scraper": "",
+                    "remaining_scrapers": to_run[to_run.index(scraper_name) :],
+                },
+            )
+            break
+
+        # Compute the effective cap for THIS scraper run:
+        # If there's a global cap, don't exceed what's left.
+        rem = budget.remaining()
+        eff_cap: int | None
+        if per_scraper_cap is None and rem is None:
+            eff_cap = None
+        elif per_scraper_cap is None and rem is not None:
+            eff_cap = int(rem)
+        elif per_scraper_cap is not None and rem is None:
+            eff_cap = int(per_scraper_cap)
+        else:
+            eff_cap = int(min(per_scraper_cap, rem))  # both present
+
+        # IMPORTANT: pass a real bool to run_scraper and drive test_limit.
+        # This triggers the same "testing" early-stop logic inside scrapers (e.g., BAE)
+        # so pagination halts once eff_cap is hit during fetch, not after.
+        s = run_scraper(
+            scraper_name,
+            testing=bool(testing_like),
+            test_limit=eff_cap,
+        )
+        s.testing = bool(testing_like)
+        if eff_cap is not None:
+            s.test_limit = int(eff_cap)
         if args.workers:
             # not all scrapers expose this attr, but our base class does
             setattr(s, "max_workers", max(1, int(args.workers)))
         if s is not None:
             ran.append(s)
+
+        # Consume from the global budget (if present)
+        if budget.remaining() is not None:
+            produced = len(getattr(s, "jobs", []) or [])
+            if produced:
+                budget.take(produced)
+            if budget.exhausted():
+                break
 
     # Optionally write one combined FULL canonical CSV across all scrapers.
     if args.combine_full:
@@ -325,6 +434,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if rows:
             out_path = Path(args.combine_full)
             out_path.parent.mkdir(parents=True, exist_ok=True)
+            # defensive trim if a global cap was set
+            if global_cap is not None and len(rows) > global_cap:
+                rows = rows[:global_cap]
             pd.DataFrame(rows).to_csv(out_path, index=False)
             logging.getLogger(__name__).info(
                 "export:combined_full",
