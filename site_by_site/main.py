@@ -18,6 +18,8 @@ import pandas as pd
 from pathlib import Path
 from time import time
 from utils.geocode import geocode_unique
+from utils.transforms import parse_date
+from datetime import datetime, date
 from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
@@ -119,6 +121,10 @@ def run_scraper(
     testing: bool = False,
     registry: Mapping[str, Type[ScraperProtocol]] = SCRAPER_MAPPING,
     test_limit: int | None = None,
+    *,
+    output_dir: Path,
+    since_date: Optional[date] = None,
+    workers: Optional[int] = None,
 ) -> ScraperProtocol | None:
     """
     Run a single scraper end-to-end and export its results.
@@ -153,12 +159,70 @@ def run_scraper(
             scraper.test_limit = int(test_limit)
         except Exception:
             scraper.test_limit = None
+    # Apply workers before running so parse thread-pool is effective
+    if workers:
+        try:
+            setattr(scraper, "max_workers", max(1, int(workers)))
+        except Exception:
+            pass
 
-    # Ensure export destination exists.
-    out_dir = Path("scraped_data")
+    # Ensure export destination exists (now configurable).
+    out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     scraper.run()
+
+    # Optional: filter by --since on canonicalized rows
+    if since_date is not None:
+
+        def _as_dt(iso_str: Optional[str]) -> Optional[date]:
+            if not iso_str:
+                return None
+            # Re-normalize defensively (canonicalizer already tries to, but safe)
+            norm = parse_date(str(iso_str))
+            if not norm:
+                return None
+            try:
+                return datetime.strptime(norm, "%Y-%m-%d").date()
+            except Exception:
+                return None
+
+        before_min = len(getattr(scraper, "jobs", []) or [])
+        jobs_min = [
+            r
+            for r in (scraper.jobs or [])
+            if _as_dt(r.get("Post Date")) and _as_dt(r.get("Post Date")) >= since_date
+        ]
+        setattr(scraper, "jobs", jobs_min)
+        logging.getLogger(__name__).info(
+            "since:filter:min",
+            extra={
+                "scraper": scraper_name,
+                "kept": len(jobs_min),
+                "prev": before_min,
+                "since": str(since_date),
+            },
+        )
+        # Also filter the full view if present
+        jf = getattr(scraper, "jobs_full", None)
+        if isinstance(jf, list) and jf:
+            before_full = len(jf)
+            jobs_full = [
+                r
+                for r in jf
+                if _as_dt(r.get("Post Date"))
+                and _as_dt(r.get("Post Date")) >= since_date
+            ]
+            setattr(scraper, "jobs_full", jobs_full)
+            logging.getLogger(__name__).info(
+                "since:filter:full",
+                extra={
+                    "scraper": scraper_name,
+                    "kept": len(jobs_full),
+                    "prev": before_full,
+                    "since": str(since_date),
+                },
+            )
     scraper.export(str(out_dir / f"{scraper_name}_jobs.csv"))
 
     print(f"Finished {scraper_name}.\n")
@@ -208,7 +272,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--combine-full",
         nargs="?",
-        const="scraped_data/all_full.csv",
+        const="__DEFAULT__",
         default=None,
         metavar="OUT_CSV",
         help=(
@@ -240,6 +304,21 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "If combined with --testing/--limit, this is an overall ceiling."
         ),
     )
+    parser.add_argument(
+        "--since",
+        type=str,
+        default=None,
+        help=(
+            "Only keep jobs posted on/after this date. Accepts YYYY-MM-DD (preferred); "
+            "also tolerates a few loose forms like '2025/11/01', 'yesterday', or '3 days ago'."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="scraped_data",
+        help="Directory to write per-scraper CSVs (default: scraped_data).",
+    )
     return parser.parse_args(argv)
 
 
@@ -255,6 +334,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
+
+    # ---------- Resolve output dir and optional --since ----------
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    since_dt: Optional[date] = None
+    if args.since:
+        norm = parse_date(str(args.since))
+        if norm:
+            since_dt = datetime.strptime(norm, "%Y-%m-%d").date()
+        else:
+            logging.getLogger(__name__).warning(
+                "since:unparseable", extra={"scraper": "", "arg": args.since}
+            )
 
     # ---------- Normalize modes & caps ----------
     # We want --limit **and** --limit-global to behave like testing (early-stop in fetch paths),
@@ -344,13 +437,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             scraper_name,
             testing=bool(testing_like),
             test_limit=eff_cap,
+            output_dir=out_dir,
+            since_date=since_dt,
+            workers=args.workers,
         )
         s.testing = bool(testing_like)
         if eff_cap is not None:
             s.test_limit = int(eff_cap)
-        if args.workers:
-            # not all scrapers expose this attr, but our base class does
-            setattr(s, "max_workers", max(1, int(args.workers)))
         if s is not None:
             ran.append(s)
 
@@ -369,6 +462,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Optionally write one combined FULL canonical CSV across all scrapers.
     if args.combine_full:
+        # If user passed bare flag, place default inside output_dir
+        if args.combine_full == "__DEFAULT__":
+            args.combine_full = str(out_dir / "all_full.csv")
         rows: list[dict] = []
         # Also gather all dedupe pairs across scrapers (if any)
         dedupe_rows: list[dict] = []
