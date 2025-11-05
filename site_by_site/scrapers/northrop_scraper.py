@@ -29,6 +29,8 @@ class NorthropGrummanScraper(JobScraper):
          the HTML detail page and parse the embedded JSON payload.
     """
 
+    # Used by the base pipeline for CSV/DB exports and incremental skip checks
+    VENDOR = "Northrop Grumman"
     START_URL = "https://jobs.northropgrumman.com/careers"
     API_URL = "https://jobs.northropgrumman.com/api/apply/v2/jobs"
 

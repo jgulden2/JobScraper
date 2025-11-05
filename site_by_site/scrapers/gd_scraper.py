@@ -46,6 +46,8 @@ class GeneralDynamicsScraper(JobScraper):
         session: `requests.Session` with default headers and referer set.
     """
 
+    # Used by the base pipeline for CSV/DB exports and incremental skip checks
+    VENDOR = "General Dynamics"
     START_URL = "https://www.gd.com/careers"
     JOB_SEARCH_URL = "https://www.gd.com/careers/job-search"
     API_PATH = "/API/Careers/CareerSearch"

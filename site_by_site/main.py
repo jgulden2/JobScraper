@@ -121,10 +121,14 @@ def run_scraper(
     testing: bool = False,
     registry: Mapping[str, Type[ScraperProtocol]] = SCRAPER_MAPPING,
     test_limit: int | None = None,
+    db_url: str | None = None,
+    db_table: str = "jobs",
+    db_mode: str = "min",
     *,
     output_dir: Path,
     since_date: Optional[date] = None,
     workers: Optional[int] = None,
+    db_skip_existing: Optional[bool] = None,
 ) -> ScraperProtocol | None:
     """
     Run a single scraper end-to-end and export its results.
@@ -153,6 +157,15 @@ def run_scraper(
     print(f"Running {scraper_name} scraper... (testing={testing})")
     scraper: ScraperProtocol = scraper_class()
     scraper.testing = testing
+    # attach DB options (instances of JobScraper will have these)
+    try:
+        setattr(scraper, "db_url", db_url)
+        setattr(scraper, "db_table", db_table)
+        setattr(scraper, "db_mode", db_mode)
+        if db_skip_existing is not None:
+            setattr(scraper, "db_skip_existing", bool(db_skip_existing))
+    except Exception:
+        pass
     if test_limit is not None:
         # honor a caller-specified cap (used for global budget)
         try:
@@ -319,6 +332,29 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default="scraped_data",
         help="Directory to write per-scraper CSVs (default: scraped_data).",
     )
+    parser.add_argument(
+        "--db-url",
+        type=str,
+        default=None,
+        help="Database URL for persistent upserts (e.g., sqlite:///./jobs.sqlite, postgresql://user:pwd@host/db).",
+    )
+    parser.add_argument(
+        "--db-table",
+        type=str,
+        default="jobs",
+        help="Target table for upserts (default: jobs).",
+    )
+    parser.add_argument(
+        "--db-mode",
+        choices=("min", "full"),
+        default="min",
+        help='Which view to upsert: "min" (canonical CSV columns) or "full" (verbose rows).',
+    )
+    parser.add_argument(
+        "--no-db-skip-existing",
+        action="store_true",
+        help="Do not skip raw listings already present in the database (default is to skip when --db-url is set).",
+    )
     return parser.parse_args(argv)
 
 
@@ -437,6 +473,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             scraper_name,
             testing=bool(testing_like),
             test_limit=eff_cap,
+            db_url=args.db_url,
+            db_table=args.db_table,
+            db_mode=args.db_mode,
+            db_skip_existing=not bool(args.no_db_skip_existing),
             output_dir=out_dir,
             since_date=since_dt,
             workers=args.workers,

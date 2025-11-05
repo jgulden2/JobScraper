@@ -87,6 +87,18 @@ class JobScraper:
         self.write_full_also = True
         self.jobs_full: List[dict] = []
 
+        # --- optional persistent storage knobs (set via CLI) ---
+        self.db_url: str | None = (
+            None  # e.g. sqlite:///./jobs.sqlite or postgresql://user:pwd@host/db
+        )
+        self.db_table: str = "jobs"
+        self.db_mode: str = (
+            "min"  # "min" -> self.jobs (canonical), "full" -> self.jobs_full
+        )
+        # When True and a DB is configured, skip raw listings already present
+        # in the DB by (Vendor, Dedupe Key). Can be toggled from CLI.
+        self.db_skip_existing: bool = True
+
         # --- concurrency knobs ---
         self.max_workers: int = 24  # good default for I/O; override per-scraper/CLI
         self._thread_local = threading.local()
@@ -454,10 +466,63 @@ class JobScraper:
         self._kept_count = len(data)
         self.log("fetch:done", n=len(data))
 
+        # -----------------------------
+        # Optional: incremental skip via DB
+        # -----------------------------
+        # Use a stable "Vendor" value if the scraper defines one; otherwise None
+        vendor_name = getattr(self, "vendor", None) or getattr(self, "VENDOR", None)
+        if not vendor_name:
+            # Last-resort fallback: readable class name without "Scraper"
+            vendor_name = self.__class__.__name__.replace("Scraper", "")
+        if self.db_url and self.db_skip_existing and data:
+            try:
+                # Build provisional keys from raw listings (ID → URL → Title)
+                from utils.db_upsert import compute_dedupe_key, get_existing_keys
+
+                def _provisional_key(raw: dict) -> str:
+                    pid = (
+                        raw.get("Posting ID")
+                        or raw.get("id")
+                        or raw.get("jobId")
+                        or raw.get("reqId")
+                        or raw.get("Requisition ID")
+                        or ""
+                    )
+                    url = (
+                        raw.get("Detail URL")
+                        or raw.get("url")
+                        or raw.get("detail_url")
+                        or raw.get("href")
+                        or ""
+                    )
+                    title = (
+                        raw.get("Position Title")
+                        or raw.get("title")
+                        or raw.get("jobTitle")
+                        or ""
+                    )
+                    return compute_dedupe_key(
+                        {"Posting ID": pid, "Detail URL": url, "Position Title": title}
+                    )
+
+                keys = [k for k in (_provisional_key(r) for r in data) if k]
+                have = get_existing_keys(self.db_url, self.db_table, vendor_name, keys)
+                if have:
+                    before = len(data)
+                    data = [r for r in data if _provisional_key(r) not in have]
+                    self.log(
+                        "incremental:skip_existing",
+                        before=before,
+                        skipped=(before - len(data)),
+                        kept=len(data),
+                    )
+            except Exception:
+                # Non-fatal: fall back to full parse if existence check fails
+                self.logger.exception("incremental:skip:error")
+
         self.log("parse:start", total=len(data))
         parsed_min: List[Dict[str, Any]] = []
         parsed_full: List[Dict[str, Any]] = []
-        vendor_name = self.__class__.__name__.replace("Scraper", "")
 
         # -------------------------
         # Parallelize parse_job()
@@ -529,3 +594,37 @@ class JobScraper:
             full_path = f"{stem}.full.{ext}"
             pd.DataFrame(self.jobs_full).to_csv(full_path, index=False)
             self.log("export:full", path=full_path, n=len(self.jobs_full))
+
+        # ---- DB upsert (optional) ----
+        try:
+            if self.db_url:
+                from utils.db_upsert import upsert_rows
+
+                payload = (
+                    self.jobs
+                    if (self.db_mode or "min") == "min"
+                    else (self.jobs_full or [])
+                )
+                if payload:
+                    n = upsert_rows(
+                        self.db_url,
+                        self.db_table,
+                        payload,
+                        extra_indexes=("Post Date",),
+                    )
+                    self.log(
+                        "export:db_upsert",
+                        url=self.db_url,
+                        table=self.db_table,
+                        mode=self.db_mode,
+                        n=n,
+                    )
+                else:
+                    self.log(
+                        "export:db_upsert:skip",
+                        reason="empty_payload",
+                        mode=self.db_mode,
+                    )
+        except Exception:
+            # Don't fail the run on DB issues; just log it
+            self.logger.exception("export:db_upsert:error")

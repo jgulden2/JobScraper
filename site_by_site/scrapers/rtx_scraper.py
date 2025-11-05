@@ -44,6 +44,9 @@ class RTXScraper(JobScraper):
       3) For each job, optionally fetch job detail pages for enrichment.
     """
 
+    # Used by the base pipeline for CSV/DB exports and incremental skip checks
+    VENDOR = "RTX"
+
     def __init__(self) -> None:
         """
         Initialize the RTX scraper with base URL, headers, and Selenium templates.

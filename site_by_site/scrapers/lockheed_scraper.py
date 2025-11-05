@@ -28,6 +28,8 @@ class LockheedMartinScraper(JobScraper):
       3) Visit each job detail page and parse JSON-LD and tagged fields.
     """
 
+    # Used by the base pipeline for CSV/DB exports and incremental skip checks
+    VENDOR = "Lockheed Martin"
     BASE_URL = "https://www.lockheedmartinjobs.com"
     SEARCH_URL = f"{BASE_URL}/search-jobs"
 

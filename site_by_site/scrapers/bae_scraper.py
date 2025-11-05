@@ -22,6 +22,9 @@ class BAESystemsScraper(JobScraper):
     to extract normalized fields for export.
     """
 
+    # Used by the base pipeline for CSV/DB exports and incremental skip checks
+    VENDOR = "BAE Systems"
+
     def __init__(self) -> None:
         """
         Initialize the scraper with base URL and headers.
