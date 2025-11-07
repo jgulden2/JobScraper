@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import threading
+import json
 import logging
 import pandas as pd
 
@@ -20,7 +21,7 @@ from pathlib import Path
 from time import time
 from utils.geocode import geocode_unique
 from utils.transforms import parse_date
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
 
@@ -241,6 +242,8 @@ def run_scraper(
 
     print(f"Finished {scraper_name}.\n")
     logger.info("run:finish", extra={"scraper": scraper_name})
+
+    # Return scraper so caller can harvest metrics later
     return scraper
 
 
@@ -356,6 +359,18 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Do not skip raw listings already present in the database (default is to skip when --db-url is set).",
     )
+    parser.add_argument(
+        "--metrics-json",
+        type=str,
+        default=None,
+        help="Write aggregated metrics to this JSON file",
+    )
+    parser.add_argument(
+        "--metrics-prom",
+        type=str,
+        default=None,
+        help="Write Prometheus text format here",
+    )
     return parser.parse_args(argv)
 
 
@@ -440,6 +455,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return self._cap is not None and self._cap <= 0
 
     budget = GlobalBudget(global_cap)
+    built: List[ScraperProtocol] = []
 
     for scraper_name in to_run:
         if budget.exhausted():
@@ -480,6 +496,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             since_date=since_dt,
             workers=args.workers,
         )
+        if s:
+            built.append(s)
+
         s.testing = bool(testing_like)
         if eff_cap is not None:
             s.test_limit = int(eff_cap)
@@ -613,6 +632,63 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             logging.getLogger(__name__).info(
                 "export:combined_full:empty",
                 extra={"scraper": "", "reason": "no_full_rows"},
+            )
+
+    # ---------- Aggregate metrics (optional) ----------
+    if args.metrics_json or args.metrics_prom:
+        # Use a readable ISO 8601 UTC timestamp for easier inspection
+        generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        agg = {"scrapers": {}, "generated_at": generated_at}
+        total_jobs = 0
+        for s in built:
+            name = s.__class__.__name__.replace("Scraper", "").lower()
+            try:
+                snap = getattr(s, "metrics").snapshot()  # type: ignore[attr-defined]
+            except Exception:
+                snap = {}
+            agg["scrapers"][name] = snap
+            try:
+                total_jobs += len(getattr(s, "jobs", []))
+            except Exception:
+                pass
+        agg["total_jobs"] = total_jobs
+
+        if args.metrics_json:
+            Path(args.metrics_json).parent.mkdir(parents=True, exist_ok=True)
+            with open(args.metrics_json, "w", encoding="utf-8") as f:
+                json.dump(agg, f, ensure_ascii=False, separators=(",", ":"))
+            logging.getLogger(__name__).info(
+                "metrics:write", extra={"scraper": "", "path": args.metrics_json}
+            )
+
+        if args.metrics_prom:
+            # ultra-simple Prometheus exposition
+            lines: List[str] = []
+
+            def emit(name: str, labels: Dict[str, str], value: float) -> None:
+                if labels:
+                    kv = ",".join(f'{k}="{v}"' for k, v in labels.items())
+                    lines.append(f"{name}{{{kv}}} {value}")
+                else:
+                    lines.append(f"{name} {value}")
+
+            for scr, snap in agg["scrapers"].items():
+                for k, v in snap.get("counters", {}).items():
+                    emit("jobscraper_counter", {"scraper": scr, "name": k}, v)
+                for k, v in snap.get("gauges", {}).items():
+                    emit("jobscraper_gauge", {"scraper": scr, "name": k}, v)
+                for k, h in snap.get("histograms", {}).items():
+                    for fld in ("count", "sum", "min", "max"):
+                        emit(
+                            "jobscraper_histogram_" + fld,
+                            {"scraper": scr, "name": k},
+                            h.get(fld, 0),
+                        )
+            Path(args.metrics_prom).parent.mkdir(parents=True, exist_ok=True)
+            with open(args.metrics_prom, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+            logging.getLogger(__name__).info(
+                "metrics:write_prom", extra={"scraper": "", "path": args.metrics_prom}
             )
 
     return 0

@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from utils.schema import CANON_COLUMNS
 from utils.canonicalize import canonicalize_record
+from utils.metrics import Metrics
 
 
 class JobScraper:
@@ -102,6 +103,8 @@ class JobScraper:
         # --- concurrency knobs ---
         self.max_workers: int = 24  # good default for I/O; override per-scraper/CLI
         self._thread_local = threading.local()
+        # --- metrics ---
+        self.metrics = Metrics(self.__class__.__name__.replace("Scraper", "").lower())
 
     # ------------------------------------------------------------------
     # Thread-local requests.Session to keep sessions safe across threads
@@ -445,7 +448,8 @@ class JobScraper:
         errors = 0
 
         self.log("fetch:start")
-        data = self.fetch_data()
+        with self.metrics.time("fetch.seconds"):
+            data = self.fetch_data()
 
         if self.testing:
             # Central, consistent testing enforcement + message
@@ -465,6 +469,7 @@ class JobScraper:
         # can consume by the assigned/kept count rather than the final deduped size.
         self._kept_count = len(data)
         self.log("fetch:done", n=len(data))
+        self.metrics.set_gauge("fetch.items", len(data))
 
         # -----------------------------
         # Optional: incremental skip via DB
@@ -516,6 +521,8 @@ class JobScraper:
                         skipped=(before - len(data)),
                         kept=len(data),
                     )
+                    self.metrics.inc("incremental.skipped", before - len(data))
+                    self.metrics.set_gauge("incremental.kept", len(data))
             except Exception:
                 # Non-fatal: fall back to full parse if existence check fails
                 self.logger.exception("incremental:skip:error")
@@ -528,22 +535,28 @@ class JobScraper:
         # Parallelize parse_job()
         # -------------------------
         self.log("parse:pool:start", workers=self.max_workers, total=len(data))
+        self.metrics.set_gauge("parse.pool_workers", self.max_workers)
 
         def _do_parse(raw_item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             # Keep parse_job untouched; it may call self.thread_get where needed.
             return self.parse_job(raw_item)
 
         idx = 0
-        with ThreadPoolExecutor(max_workers=self.max_workers) as ex:
+        with (
+            self.metrics.time("parse.pool_seconds"),
+            ThreadPoolExecutor(max_workers=self.max_workers) as ex,
+        ):
             futures = [ex.submit(_do_parse, r) for r in data]
             for fut in as_completed(futures):
                 try:
                     rec = fut.result()
                 except Exception:
                     errors += 1
+                    self.metrics.inc("parse.errors")
                     self.logger.exception("parse:error")
                     continue
                 if not rec:
+                    self.metrics.inc("parse.skipped")
                     continue
                 idx += 1
                 artifacts = rec.pop("artifacts", None)
@@ -555,10 +568,13 @@ class JobScraper:
                 parsed_min.append({k: canon_row.get(k, "") for k in CANON_COLUMNS})
                 if idx == 1 or idx % self.log_every == 0:
                     self.log("parse:progress", idx=idx, total=len(data))
+        self.metrics.set_gauge("parse.parsed_min", len(parsed_min))
         self.log("parse:pool:done", parsed=len(parsed_min))
 
         # De-duplicate both views using the same keys
+        before_dedup = len(parsed_min)
         parsed_min = self.dedupe_records(parsed_min)
+        self.metrics.inc("dedupe.dropped", before_dedup - len(parsed_min))
         if self.write_full_also:
             parsed_full = self.dedupe_records(parsed_full)
             self.jobs_full = parsed_full
@@ -567,7 +583,10 @@ class JobScraper:
 
         self.log("done", count=len(self.jobs))
         self.log("parse:errors", n=errors)
-        self.log("run:duration", seconds=round(time() - start, 3))
+        total_sec = round(time() - start, 3)
+        self.metrics.observe("run.seconds", total_sec)
+        self.metrics.set_gauge("output.jobs", len(self.jobs))
+        self.log("run:duration", seconds=total_sec)
 
     # -----------------------------
     # Export
@@ -594,6 +613,7 @@ class JobScraper:
             full_path = f"{stem}.full.{ext}"
             pd.DataFrame(self.jobs_full).to_csv(full_path, index=False)
             self.log("export:full", path=full_path, n=len(self.jobs_full))
+            self.metrics.set_gauge("output.jobs_full", len(self.jobs_full))
 
         # ---- DB upsert (optional) ----
         try:
@@ -619,6 +639,7 @@ class JobScraper:
                         mode=self.db_mode,
                         n=n,
                     )
+                    self.metrics.inc("db.upsert_rows", n)
                 else:
                     self.log(
                         "export:db_upsert:skip",
@@ -628,3 +649,4 @@ class JobScraper:
         except Exception:
             # Don't fail the run on DB issues; just log it
             self.logger.exception("export:db_upsert:error")
+            self.metrics.inc("db.errors")
