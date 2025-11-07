@@ -1,0 +1,32 @@
+{
+    "jobId": "123456",
+    "title": "Software Engineer I",
+    "description": "<p>Build stuff</p>",
+    "postedDate": "2025-10-30",
+    "isUsCitizenshipRequired": "Yes",
+    "isSecurityClearanceRequired": "Secret",
+    "clearenceLevel": "Secret",
+    "payRange": "$90,000 - $120,000",
+    "salaryMin": 90000,
+    "salaryMax": 120000,
+    "bonus": 5000,
+    "physicalLocation": "Onsite",
+    "structureData": {
+        "employmentType": "Full-time",
+        "workHours": "40"
+    },
+    "travelPercentage": "10%",
+    "category": "Engineering",
+    "sector": "I&S",
+    "businessArea": "Cyber",
+    "industry": "Defense",
+    "shift": "1st",
+    "careerLevel": "Entry",
+    "location": "Austin, TX",
+    "country": "US",
+    "state": "TX",
+    "city": "Austin",
+    "postalCode": "73301",
+    "latitude": 30.27,
+    "longitude": -97.74
+}

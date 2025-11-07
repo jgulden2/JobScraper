@@ -1,0 +1,28 @@
+{
+    "_jsonld": {
+        "@context": "https://schema.org/",
+        "@type": "JobPosting",
+        "description": "Work on guidance systems and control algorithms.",
+        "datePosted": "2025-11-01",
+        "employmentType": "Full-time",
+        "jobLocation": [
+            {
+                "address": {
+                    "addressLocality": "San Diego",
+                    "addressRegion": "CA",
+                    "addressCountry": "US",
+                    "postalCode": "92121"
+                }
+            }
+        ],
+        "workHours": "40"
+    },
+    "_vendor_blob": {
+        "businessUnit": "Collins",
+        "relocationEligible": true,
+        "clearanceType": "Secret",
+        "isSalaryVisible": true,
+        "maxSalary": 140000,
+        "minSalary": 100000
+    }
+}

@@ -12,6 +12,7 @@ The registry of available scrapers is imported from `scrapers.SCRAPER_REGISTRY`.
 from __future__ import annotations
 
 import argparse
+import threading
 import logging
 import pandas as pd
 
@@ -421,8 +422,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Tiny, thread-safe global budget (if requested)
     class GlobalBudget:
         def __init__(self, cap):
-            import threading
-
             self._cap = cap
             self._lock = threading.Lock()
 

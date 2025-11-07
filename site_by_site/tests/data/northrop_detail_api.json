@@ -1,0 +1,10 @@
+{
+    "data": {
+        "id": "abc",
+        "title": "Avionics Engineer",
+        "postingDate": "2025-09-20",
+        "employmentType": "Full-time",
+        "jobDescription": "Design mission-critical avionics hardware.",
+        "clearance": "Secret"
+    }
+}
