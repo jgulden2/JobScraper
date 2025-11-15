@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api";
 import FiltersBar from "./FiltersBar";
+import JobModal from "./JobModal";
+
 
 const PAGE_SIZE = 50;
 
@@ -9,6 +11,8 @@ export default function JobsPage() {
   const [page, setPage] = useState(0); // 0-based
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
+
 
   // Filters: vendor, searchTerm (maps to q), since (YYYY-MM-DD)
   const [filters, setFilters] = useState({
@@ -164,7 +168,7 @@ export default function JobsPage() {
               </th>
             </tr>
           </thead>
-          <tbody>
+                    <tbody>
             {jobs.map((job, idx) => {
               const key =
                 job["Posting ID"] ??
@@ -172,7 +176,13 @@ export default function JobsPage() {
                 `${job.Vendor || "job"}-${idx}`;
 
               return (
-                <tr key={key}>
+                <tr
+                  key={key}
+                  onClick={() => setSelectedJob(job)}
+                  style={{
+                    cursor: "pointer",
+                  }}
+                >
                   <td
                     style={{
                       borderBottom: "1px solid #eee",
@@ -212,7 +222,7 @@ export default function JobsPage() {
         </table>
       )}
 
-      <div
+            <div
         style={{
           marginTop: 16,
           display: "flex",
@@ -236,6 +246,15 @@ export default function JobsPage() {
           Next
         </button>
       </div>
+
+      {/* Job detail modal */}
+      {selectedJob && (
+        <JobModal
+          job={selectedJob}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
     </section>
   );
 }
+
