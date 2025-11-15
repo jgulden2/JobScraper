@@ -24,3 +24,32 @@ export async function apiGet(path, options = {}) {
 
   return resp.json();
 }
+
+// Generic POST helper
+export async function apiPost(path, body, options = {}) {
+  const url = `${API_BASE_URL}${path}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    body: JSON.stringify(body ?? {}),
+    ...options,
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    const err = new Error(`API POST ${url} failed: ${resp.status}`);
+    err.status = resp.status;
+    err.body = text;
+    throw err;
+  }
+
+  // In case /runs returns 204
+  if (resp.status === 204) {
+    return null;
+  }
+
+  return resp.json();
+}

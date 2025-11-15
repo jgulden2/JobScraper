@@ -7,3 +7,4 @@ site_by_site/testnb.ipynb
 site_by_site/tests/__pycache__
 site_by_site/tests/.pytest_cache
 site_by_site/.pytest_cache
+site_by_site/logs
