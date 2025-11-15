@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api";
+import FiltersBar from "./FiltersBar";
 
 const PAGE_SIZE = 50;
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState([]);
-  const [page, setPage] = useState(0);        // 0-based
+  const [page, setPage] = useState(0); // 0-based
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Filters: vendor, searchTerm (maps to q), since (YYYY-MM-DD)
+  const [filters, setFilters] = useState({
+    vendor: null,
+    searchTerm: null,
+    since: null,
+  });
+
+  // Whenever filters change, reset to page 0
+  const handleFiltersChange = (partial) => {
+    setPage(0);
+    setFilters((prev) => ({
+      ...prev,
+      ...partial,
+    }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -16,8 +33,22 @@ export default function JobsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const offset = page * PAGE_SIZE;
-        const data = await apiGet(`/jobs?limit=${PAGE_SIZE}&offset=${offset}`);
+        const params = new URLSearchParams();
+        params.set("limit", PAGE_SIZE.toString());
+        params.set("offset", String(page * PAGE_SIZE));
+
+        if (filters.vendor) {
+          params.set("vendor", filters.vendor);
+        }
+        if (filters.searchTerm) {
+          params.set("q", filters.searchTerm);
+        }
+        if (filters.since) {
+          params.set("since", filters.since);
+        }
+
+        const path = `/jobs?${params.toString()}`;
+        const data = await apiGet(path);
 
         if (!cancelled) {
           setJobs(Array.isArray(data) ? data : []);
@@ -39,7 +70,7 @@ export default function JobsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, filters.vendor, filters.searchTerm, filters.since]);
 
   const canGoPrev = page > 0 && !isLoading;
   const canGoNext = jobs.length === PAGE_SIZE && !isLoading; // assume no more if < 50
@@ -60,7 +91,18 @@ export default function JobsPage() {
   return (
     <section style={{ marginTop: 24 }}>
       <h2>Jobs</h2>
-      <p>Showing {jobs.length} jobs – page {page + 1}</p>
+
+      {/* Filters bar */}
+      <FiltersBar
+        vendor={filters.vendor}
+        searchTerm={filters.searchTerm}
+        since={filters.since}
+        onChange={handleFiltersChange}
+      />
+
+      <p>
+        Showing {jobs.length} jobs – page {page + 1}
+      </p>
 
       {error && (
         <p style={{ color: "red" }}>
@@ -84,16 +126,40 @@ export default function JobsPage() {
         >
           <thead>
             <tr>
-              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "4px 8px" }}>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "4px 8px",
+                }}
+              >
                 Title
               </th>
-              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "4px 8px" }}>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "4px 8px",
+                }}
+              >
                 Date
               </th>
-              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "4px 8px" }}>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "4px 8px",
+                }}
+              >
                 Location
               </th>
-              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "4px 8px" }}>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "4px 8px",
+                }}
+              >
                 Company
               </th>
             </tr>
@@ -107,16 +173,36 @@ export default function JobsPage() {
 
               return (
                 <tr key={key}>
-                  <td style={{ borderBottom: "1px solid #eee", padding: "4px 8px" }}>
+                  <td
+                    style={{
+                      borderBottom: "1px solid #eee",
+                      padding: "4px 8px",
+                    }}
+                  >
                     {job["Position Title"] || "(no title)"}
                   </td>
-                  <td style={{ borderBottom: "1px solid #eee", padding: "4px 8px" }}>
+                  <td
+                    style={{
+                      borderBottom: "1px solid #eee",
+                      padding: "4px 8px",
+                    }}
+                  >
                     {formatDate(job["Post Date"])}
                   </td>
-                  <td style={{ borderBottom: "1px solid #eee", padding: "4px 8px" }}>
+                  <td
+                    style={{
+                      borderBottom: "1px solid #eee",
+                      padding: "4px 8px",
+                    }}
+                  >
                     {job["Raw Location"] || job.City || job.State || ""}
                   </td>
-                  <td style={{ borderBottom: "1px solid #eee", padding: "4px 8px" }}>
+                  <td
+                    style={{
+                      borderBottom: "1px solid #eee",
+                      padding: "4px 8px",
+                    }}
+                  >
                     {job.Vendor || "(unknown)"}
                   </td>
                 </tr>
@@ -126,7 +212,14 @@ export default function JobsPage() {
         </table>
       )}
 
-      <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "center" }}>
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
         <button
           type="button"
           disabled={!canGoPrev}
