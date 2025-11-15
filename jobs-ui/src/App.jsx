@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { apiGet, API_BASE_URL } from "./api";
+import JobsPage from "./JobsPage.jsx";
 
 // ------------ Home page (keeps the /health check you already had) ------------
 function HomePage() {
@@ -45,16 +46,6 @@ function HomePage() {
       )}
 
       {!health && !error && <p>Checking backend…</p>}
-    </section>
-  );
-}
-
-// ------------ Placeholder pages ------------
-function JobsPage() {
-  return (
-    <section style={{ marginTop: 24 }}>
-      <h2>Jobs</h2>
-      <p>JobsPage placeholder – we&apos;ll list jobs here later.</p>
     </section>
   );
 }

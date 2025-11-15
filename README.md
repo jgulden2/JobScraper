@@ -15,4 +15,5 @@ npm run dev
 
 To open backend on CMD:
 cd to site_by_site
+conda activate job_scraper
 python api/app.py
