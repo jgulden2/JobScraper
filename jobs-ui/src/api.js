@@ -4,13 +4,26 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
+function getCsrfTokenFromCookie() {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function apiGet(path, options = {}) {
   const url = `${API_BASE_URL}${path}`;
+  const csrfToken = getCsrfTokenFromCookie();
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (csrfToken) {
+    headers["X-CSRFToken"] = csrfToken;
+  }
+
   const resp = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
     credentials: "include",
     ...options,
   });
@@ -29,12 +42,19 @@ export async function apiGet(path, options = {}) {
 // Generic POST helper
 export async function apiPost(path, body, options = {}) {
   const url = `${API_BASE_URL}${path}`;
+  const csrfToken = getCsrfTokenFromCookie();
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (csrfToken) {
+    headers["X-CSRFToken"] = csrfToken;
+  }
+
   const resp = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
     credentials: "include",
     body: JSON.stringify(body ?? {}),
     ...options,
@@ -48,7 +68,6 @@ export async function apiPost(path, body, options = {}) {
     throw err;
   }
 
-  // In case /runs returns 204
   if (resp.status === 204) {
     return null;
   }

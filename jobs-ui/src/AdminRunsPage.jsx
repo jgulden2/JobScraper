@@ -53,7 +53,6 @@ function RunLogsModal({ run, onClose }) {
       setError(null);
       try {
         // /runs/<id>/logs returns plain text, not JSON
-        // /runs/<id>/logs returns plain text, not JSON
         const resp = await fetch(`${API_BASE_URL}/runs/${run.id}/logs`, {
         method: "GET",
         credentials: "include", // IMPORTANT: send session cookie

@@ -8,11 +8,16 @@ from sqlalchemy import select, func
 from flask import Flask, request, jsonify, Response, session
 from flask_cors import CORS
 from functools import wraps
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
+from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
 
+load_dotenv()
+
 # Default to local SQLite cache unless JOBS_DB_URL is set
-DATABASE_URL = os.getenv("JOBS_DB_URL", "sqlite:///./.cache/jobs.sqlite")
-TABLE_NAME = os.getenv("JOBS_DB_TABLE", "jobs")
+DATABASE_URL = os.getenv("JOBS_DB_URL")
+TABLE_NAME = os.getenv("JOBS_DB_TABLE")
 
 engine = sa.create_engine(DATABASE_URL, future=True)
 meta = sa.MetaData()
@@ -28,12 +33,20 @@ users = sa.Table(
 )
 meta.create_all(engine)
 
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+if not SECRET_KEY or SECRET_KEY == "dev-override-this":
+    raise RuntimeError(
+        "FLASK_SECRET_KEY must be set to a strong random value in production"
+    )
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-override-this")
+CSRFProtect(app)
+app.config["SECRET_KEY"] = SECRET_KEY
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False  # Set to True when on HTTPS
 
-CORS(app, supports_credentials=True)  # allow the React dev server to call the API
+CORS(app, supports_credentials=True, origins=[FRONTEND_ORIGIN])
 
 
 def _int(name, default):
@@ -71,6 +84,20 @@ def require_role(role):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.after_request
+def add_csrf_cookie(response):
+    # Generate a new CSRF token and set it in a cookie for the frontend to read
+    csrf_token = generate_csrf()
+    response.set_cookie(
+        "csrf_token",
+        csrf_token,
+        secure=app.config["SESSION_COOKIE_SECURE"],
+        samesite=app.config["SESSION_COOKIE_SAMESITE"],
+        httponly=False,  # must be readable from JS
+    )
+    return response
 
 
 # ---------- Vendors (portable for SQLite/Postgres) ----------
@@ -408,4 +435,4 @@ def auth_me():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+    app.run(debug=os.getenv("FLASK_DEBUG") == "1", port=8000)
