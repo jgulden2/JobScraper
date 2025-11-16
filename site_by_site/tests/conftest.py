@@ -122,7 +122,6 @@ def mock_fetch_artifacts(monkeypatch):
                 mod = importlib.import_module(dotted)
                 monkeypatch.setattr(mod, "fetch_detail_artifacts", _fake, raising=True)
             except Exception:
-                # module might not exist in your tree; skip
                 pass
 
     return apply

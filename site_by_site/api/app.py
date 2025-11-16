@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 
-# Default to your local SQLite cache unless JOBS_DB_URL is set
+# Default to local SQLite cache unless JOBS_DB_URL is set
 DATABASE_URL = os.getenv("JOBS_DB_URL", "sqlite:///./.cache/jobs.sqlite")
 TABLE_NAME = os.getenv("JOBS_DB_TABLE", "jobs")
 
@@ -159,7 +159,6 @@ def start_run():
             if payload.get("workers"):
                 args += ["--workers", str(int(payload["workers"]))]
 
-            # DB opts default to your current DB (you can override via payload)
             args += ["--db-url", os.getenv("JOBS_DB_URL", DATABASE_URL)]
             args += ["--db-table", os.getenv("JOBS_DB_TABLE", TABLE_NAME)]
 

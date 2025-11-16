@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { apiGet, apiPost, API_BASE_URL } from "./api";
 import JobsPage from "./JobsPage.jsx";
+import AdminRunsPage from "./AdminRunsPage.jsx";
 
 // -----------------------------------------------------------------------------
 // Home page (keeps the /health check you already had)
@@ -460,7 +461,13 @@ export default function App() {
         <Link to="/">Home</Link>
         <Link to="/jobs">Jobs</Link>
 
-        {role === "admin" && <Link to="/admin/scrape">Admin Scrape</Link>}
+        {role === "admin" && (
+          <>
+            <Link to="/admin/scrape">Admin Scrape</Link>
+            <Link to="/admin/runs">Runs &amp; Logs</Link>
+          </>
+        )}
+
 
         {role ? (
           <button
@@ -493,7 +500,7 @@ export default function App() {
           path="/login"
           element={<LoginPage role={role} setRole={setRole} />}
         />
-        <Route
+                <Route
           path="/jobs"
           element={
             <ProtectedRoute role={role}>
@@ -506,6 +513,14 @@ export default function App() {
           element={
             <ProtectedRoute role={role} requiredRole="admin">
               <AdminScrapePage showToast={showToast} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/runs"
+          element={
+            <ProtectedRoute role={role} requiredRole="admin">
+              <AdminRunsPage />
             </ProtectedRoute>
           }
         />
