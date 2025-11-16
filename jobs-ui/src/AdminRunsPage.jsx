@@ -53,16 +53,23 @@ function RunLogsModal({ run, onClose }) {
       setError(null);
       try {
         // /runs/<id>/logs returns plain text, not JSON
-        const resp = await fetch(`${API_BASE_URL}/runs/${run.id}/logs`);
+        // /runs/<id>/logs returns plain text, not JSON
+        const resp = await fetch(`${API_BASE_URL}/runs/${run.id}/logs`, {
+        method: "GET",
+        credentials: "include", // IMPORTANT: send session cookie
+        });
+
         if (!resp.ok) {
-          const text = await resp.text().catch(() => "");
-          const err = new Error(
+        const text = await resp.text().catch(() => "");
+        const err = new Error(
             `GET /runs/${run.id}/logs failed: ${resp.status}`
-          );
-          err.body = text;
-          throw err;
+        );
+        err.body = text;
+        throw err;
         }
+
         const text = await resp.text();
+
         if (!cancelled) {
           setLogText(text || "(no logs yet)");
         }
