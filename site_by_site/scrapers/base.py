@@ -239,8 +239,6 @@ class JobScraper:
                 continue
             if k in seen:
                 winner = seen[k]
-                # Emit a structured log entry (handy if you tail logs),
-                # and also keep an in-memory pair for later export.
                 self.log(
                     "dedupe:drop",
                     key=k,

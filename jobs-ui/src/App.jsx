@@ -9,10 +9,9 @@ import {
 import { apiGet, apiPost, API_BASE_URL } from "./api";
 import JobsPage from "./JobsPage.jsx";
 import AdminRunsPage from "./AdminRunsPage.jsx";
+import AdminUsersPage from "./AdminUsersPage.jsx";
 
-// -----------------------------------------------------------------------------
-// Home page (keeps the /health check you already had)
-// -----------------------------------------------------------------------------
+
 function HomePage() {
   const [health, setHealth] = useState(null);
   const [error, setError] = useState(null);
@@ -366,45 +365,138 @@ function AdminScrapePage({ showToast }) {
 }
 
 // -----------------------------------------------------------------------------
-// Simple login that just sets a fake role
+// Login / Register page – toggle between /auth/login and /auth/register
 // -----------------------------------------------------------------------------
-function LoginPage({ role, setRole }) {
+function LoginPage({ onLogin }) {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (newRole) => {
-    setRole(newRole);
-    // send user somewhere sensible based on role
-    navigate(newRole === "admin" ? "/admin/scrape" : "/jobs", {
-      replace: true,
-    });
+  const isRegister = mode === "register";
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const path = isRegister ? "/auth/register" : "/auth/login";
+      const user = await apiPost(path, { email, password });
+
+      onLogin(user); // { id, email, role }
+
+      // After login/register, send admin to admin page, others to jobs
+      navigate(user.role === "admin" ? "/admin/scrape" : "/jobs", {
+        replace: true,
+      });
+    } catch (err) {
+      console.error("Auth failed:", err);
+
+      // Basic friendly messages
+      if (isRegister) {
+        // backend returns 409 for email already registered
+        setError(
+          err?.message ||
+            "Could not register. This email may already be in use."
+        );
+      } else {
+        setError("Invalid email or password");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleLogout = () => {
-    setRole(null);
-    navigate("/login", { replace: true });
+  const toggleMode = () => {
+    setMode((prev) => (prev === "login" ? "register" : "login"));
+    setError(null);
   };
 
   return (
-    <section style={{ marginTop: 24 }}>
-      <h2>Login</h2>
-      <p>
-        This is a fake login screen. Pick a role – no passwords, no backend
-        involved yet.
-      </p>
+    <section style={{ marginTop: 24, maxWidth: 400 }}>
+      <h2>{isRegister ? "Create an account" : "Log in"}</h2>
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          marginTop: 16,
+          padding: 16,
+          borderRadius: 4,
+          border: "1px solid #ddd",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span>Email</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
+        </label>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-        <button type="button" onClick={() => handleLogin("user")}>
-          Log in as user
-        </button>
-        <button type="button" onClick={() => handleLogin("admin")}>
-          Log in as admin
-        </button>
-        {role && (
-          <button type="button" onClick={handleLogout}>
-            Log out
-          </button>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete={isRegister ? "new-password" : "current-password"}
+          />
+        </label>
+
+        {error && (
+          <p style={{ color: "red", fontSize: 13 }}>
+            {error}
+          </p>
         )}
-      </div>
+
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting
+            ? isRegister
+              ? "Creating account…"
+              : "Logging in…"
+            : isRegister
+            ? "Register"
+            : "Log in"}
+        </button>
+
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>
+            {isRegister ? "Already have an account?" : "No account yet?"}
+          </span>
+          <button
+            type="button"
+            onClick={toggleMode}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "rgb(43, 76, 200)",
+              textDecoration: "underline",
+              fontSize: "inherit",
+            }}
+          >
+            {isRegister ? "Log in" : "Register"}
+          </button>
+        </div>
+      </form>
     </section>
   );
 }
@@ -412,22 +504,40 @@ function LoginPage({ role, setRole }) {
 // -----------------------------------------------------------------------------
 // ProtectedRoute component
 // -----------------------------------------------------------------------------
-function ProtectedRoute({ role, requiredRole, children }) {
-  if (!role) {
+function ProtectedRoute({ currentUser, requiredRole, children }) {
+  if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
-  if (requiredRole && role !== requiredRole) {
+  if (requiredRole && currentUser.role !== requiredRole) {
     return <Navigate to="/login" replace />;
   }
   return children;
 }
 
+
 // -----------------------------------------------------------------------------
 // App shell with nav + routes + ToastManager
 // -----------------------------------------------------------------------------
 export default function App() {
-  // Very dumb role state (user | admin | null)
-  const [role, setRole] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    apiGet("/auth/me")
+      .then((data) => {
+        if (data.authenticated) {
+          setCurrentUser({ id: data.id, email: data.email, role: data.role });
+        } else {
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => {
+        setCurrentUser(null);
+      })
+      .finally(() => {
+        setAuthChecked(true);
+      });
+  }, []);
 
   // ToastManager state
   const [toasts, setToasts] = useState([]);
@@ -440,6 +550,18 @@ export default function App() {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   };
+
+  const handleLogout = async () => {
+    try {
+      await apiPost("/auth/logout", {});
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      setCurrentUser(null);
+    }
+  };
+
+  if (!authChecked) return <main style={{ padding: 24 }}>Checking login…</main>;
 
   return (
     <main style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
@@ -458,26 +580,27 @@ export default function App() {
           alignItems: "center",
         }}
       >
-        <Link to="/">Home</Link>
+                <Link to="/">Home</Link>
         <Link to="/jobs">Jobs</Link>
 
-        {role === "admin" && (
+        {currentUser?.role === "admin" && (
           <>
             <Link to="/admin/scrape">Admin Scrape</Link>
             <Link to="/admin/runs">Runs &amp; Logs</Link>
+            <Link to="/admin/users">Users</Link>
           </>
         )}
 
 
-        {role ? (
+        {currentUser ? (
           <button
-            onClick={() => setRole(null)}
+            onClick={handleLogout}
             style={{
               background: "none",
               border: "none",
               padding: 0,
               cursor: "pointer",
-              color: "rgb(43, 76, 200)", // react-router link color
+              color: "rgb(43, 76, 200)",
               textDecoration: "underline",
               fontSize: "inherit",
             }}
@@ -489,7 +612,12 @@ export default function App() {
         )}
 
         <span style={{ marginLeft: "auto", fontStyle: "italic" }}>
-          Current role: <strong>{role ?? "none"}</strong>
+          Current user:{" "}
+          <strong>
+            {currentUser
+              ? `${currentUser.email} (${currentUser.role})`
+              : "none"}
+          </strong>
         </span>
       </nav>
 
@@ -498,12 +626,12 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route
           path="/login"
-          element={<LoginPage role={role} setRole={setRole} />}
+          element={<LoginPage onLogin={setCurrentUser} />}
         />
-                <Route
+        <Route
           path="/jobs"
           element={
-            <ProtectedRoute role={role}>
+            <ProtectedRoute currentUser={currentUser}>
               <JobsPage />
             </ProtectedRoute>
           }
@@ -511,7 +639,7 @@ export default function App() {
         <Route
           path="/admin/scrape"
           element={
-            <ProtectedRoute role={role} requiredRole="admin">
+            <ProtectedRoute currentUser={currentUser} requiredRole="admin">
               <AdminScrapePage showToast={showToast} />
             </ProtectedRoute>
           }
@@ -519,12 +647,19 @@ export default function App() {
         <Route
           path="/admin/runs"
           element={
-            <ProtectedRoute role={role} requiredRole="admin">
+            <ProtectedRoute currentUser={currentUser} requiredRole="admin">
               <AdminRunsPage />
             </ProtectedRoute>
           }
         />
-        {/* Catch-all: redirect unknown routes to home */}
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute currentUser={currentUser} requiredRole="admin">
+              <AdminUsersPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

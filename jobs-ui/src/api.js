@@ -11,6 +11,7 @@ export async function apiGet(path, options = {}) {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    credentials: "include",
     ...options,
   });
 
@@ -34,6 +35,7 @@ export async function apiPost(path, body, options = {}) {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    credentials: "include",
     body: JSON.stringify(body ?? {}),
     ...options,
   });

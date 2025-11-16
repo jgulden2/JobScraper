@@ -481,7 +481,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         else:
             eff_cap = int(min(per_scraper_cap, rem))  # both present
 
-        # IMPORTANT: pass a real bool to run_scraper and drive test_limit.
+        # pass a real bool to run_scraper and drive test_limit.
         # This triggers the same "testing" early-stop logic inside scrapers (e.g., BAE/Lockheed/RTX/GD/Northrop)
         # so pagination halts once eff_cap is hit during fetch, not after.
         s = run_scraper(

@@ -291,7 +291,7 @@ def extract_bold_block(soup: BS) -> Dict[str, str]:
                 data[label] = val
         else:
             data[label] = val
-    # Flatten lists into strings (or keep lists if you prefer arrays)
+
     for k, v in list(data.items()):
         if isinstance(v, list):
             data[k] = "; ".join(v)

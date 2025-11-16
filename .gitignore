@@ -8,3 +8,4 @@ site_by_site/tests/__pycache__
 site_by_site/tests/.pytest_cache
 site_by_site/.pytest_cache
 site_by_site/logs
+site_by_site/api/create_admin.py
