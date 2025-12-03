@@ -116,6 +116,7 @@ def mock_fetch_artifacts(monkeypatch):
             "scrapers.rtx_scraper",
             "scrapers.gd_scraper",
             "scrapers.northrop_scraper",
+            "scrapers.usajobs_scraper",
         ]
         for dotted in targets:
             try:

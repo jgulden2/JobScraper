@@ -63,6 +63,7 @@ const SCRAPERS = [
   { id: "northropgrumman", label: "Northrop Grumman" },
   { id: "baesystems", label: "BAE Systems" },
   { id: "generaldynamics", label: "General Dynamics" },
+  { id: "usajobs", label: "USAJOBS" },
 ];
 
 function AdminScrapePage({ showToast }) {
