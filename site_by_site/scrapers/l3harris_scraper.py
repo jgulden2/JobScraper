@@ -15,9 +15,8 @@ class L3HarrisScraper(JobScraper):
     SEARCH_URL = f"{BASE_URL}/en/search-jobs"
     SITEMAP_URL = f"{BASE_URL}/en/sitemap.xml"
 
-    def __init__(self, delay: float = 0.5) -> None:
+    def __init__(self) -> None:
         super().__init__(self.SEARCH_URL, headers={"User-Agent": "Mozilla/5.0"})
-        self.delay = delay
 
     def fetch_data(self) -> List[Dict[str, str]]:
         resp = self.get(self.SITEMAP_URL)

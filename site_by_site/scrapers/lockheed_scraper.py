@@ -8,7 +8,6 @@ a normalized record for export.
 
 from __future__ import annotations
 
-from time import sleep
 from typing import Dict, List, Optional, Set
 
 from bs4 import BeautifulSoup as BS
@@ -33,13 +32,12 @@ class LockheedMartinScraper(JobScraper):
     BASE_URL = "https://www.lockheedmartinjobs.com"
     SEARCH_URL = f"{BASE_URL}/search-jobs"
 
-    def __init__(self, max_pages: Optional[int] = None, delay: float = 0.5) -> None:
+    def __init__(self, max_pages: Optional[int] = None) -> None:
         """
         Initialize the scraper with UI endpoints and runtime tuning knobs.
 
         Args:
             max_pages: Optional maximum number of listing pages to visit.
-            delay: Sleep (seconds) between page fetches to be polite.
 
         Returns:
             None
@@ -50,7 +48,6 @@ class LockheedMartinScraper(JobScraper):
         super().__init__(self.SEARCH_URL, headers={"User-Agent": "Mozilla/5.0"})
         self.visited_job_ids: Set[str] = set()
         self.max_pages: Optional[int] = max_pages
-        self.delay = delay
 
     # -------------------------------------------------------------------------
     # Lifecycle
@@ -91,7 +88,6 @@ class LockheedMartinScraper(JobScraper):
                     break
                 all_job_links.append(link)
 
-            sleep(self.delay)
             # If we hit the cap inside this page, stop paging.
             if len(all_job_links) >= job_limit:
                 break
