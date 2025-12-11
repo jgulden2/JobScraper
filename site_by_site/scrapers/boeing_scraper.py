@@ -1,231 +1,74 @@
-"""
-Boeing scraper.
-
-Lists job result pages from the public Boeing careers search UI, gathers
-per-job links/IDs, and then parses each job detail page (preferring JSON-LD)
-into a normalized record for export.
-"""
-
 from __future__ import annotations
 
-from time import sleep
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup as BS
 
 from scrapers.base import JobScraper
 from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts
+from utils.sitemap import parse_sitemap_xml
 
 
 class BoeingScraper(JobScraper):
-    """
-    Scraper for Boeing job postings.
-
-    Workflow:
-      1) Determine total listing pages from the search results page.
-      2) Iterate result pages to collect job links and IDs (de-duped per run).
-      3) Visit each job detail page and parse JSON-LD and tagged fields.
-    """
-
     VENDOR = "Boeing"
     BASE_URL = "https://jobs.boeing.com"
     SEARCH_URL = f"{BASE_URL}/search-jobs"
+    SITEMAP_URL = f"{BASE_URL}/sitemap.xml"
 
-    def __init__(self, max_pages: Optional[int] = None, delay: float = 0.5) -> None:
-        """
-        Initialize the scraper with UI endpoints and runtime tuning knobs.
-
-        Args:
-            max_pages: Optional maximum number of listing pages to visit.
-            delay: Sleep (seconds) between page fetches to be polite.
-        """
+    def __init__(self, max_pages: Optional[int] = None) -> None:
         super().__init__(self.SEARCH_URL, headers={"User-Agent": "Mozilla/5.0"})
-        self.visited_job_ids: Set[str] = set()
         self.max_pages: Optional[int] = max_pages
-        self.delay = delay
 
-    # -------------------------------------------------------------------------
-    # Listing helpers
-    # -------------------------------------------------------------------------
-    def get_total_pages(self) -> int:
-        """
-        Read pagination metadata from the first search-results page.
-
-        Returns:
-            Total number of result pages (>=1).
-
-        Raises:
-            requests.RequestException: If the GET fails.
-            ValueError: If required pagination attributes are missing/invalid.
-        """
-        resp = self.get(self.SEARCH_URL)
-        resp.raise_for_status()
-        soup = BS(resp.text, "lxml")
-
-        section = soup.select_one("section.search-results#search-results")
-        if section is None:
-            raise ValueError(
-                "Unable to locate <section id='search-results'> for Boeing"
-            )
-
-        total_pages_str = section.get("data-total-pages") or "1"
-        total_results_str = section.get("data-total-results") or "0"
-
-        try:
-            total_pages = int(total_pages_str)
-        except ValueError as e:
-            raise ValueError(
-                f"Invalid data-total-pages value: {total_pages_str!r}"
-            ) from e
-
-        try:
-            total_results = int(total_results_str)
-        except ValueError:
-            total_results = 0
-
-        self.log("source:total", total_results=total_results, total_pages=total_pages)
-
-        if total_pages < 1:
-            total_pages = 1
-
-        if self.max_pages:
-            total_pages = min(total_pages, self.max_pages)
-
-        return total_pages
-
-    def get_job_links(self, page_num: int) -> List[Dict[str, str]]:
-        """
-        Collect job links/IDs from a single search-results page.
-
-        Args:
-            page_num: 1-based page index.
-
-        Returns:
-            List of listing dicts with keys:
-              - "Posting ID"
-              - "Detail URL"
-              - "Position Title"
-              - "Raw Location"
-              - "Post Date"
-        """
-        if page_num <= 1:
-            page_url = self.SEARCH_URL
-        else:
-            # TalentBrew paging convention: ?p=N
-            page_url = f"{self.SEARCH_URL}?p={page_num}"
-
-        resp = self.get(page_url)
-        resp.raise_for_status()
-        soup = BS(resp.text, "lxml")
-
-        container = soup.select_one("#search-results-list")
-        if container is None:
-            self.log("list:empty_page", page=page_num)
-            return []
-
-        results: List[Dict[str, str]] = []
-
-        # Each job is a <li> containing an <a.search-results__job-link data-job-id="...">
-        for li in container.select("ul > li"):
-            a = li.select_one("a.search-results__job-link[data-job-id]")
-            if a is None:
-                continue
-
-            job_id = (a.get("data-job-id") or "").strip()
-            if not job_id:
-                continue
-            if job_id in self.visited_job_ids:
-                # De-dupe across pages
-                continue
-            self.visited_job_ids.add(job_id)
-
-            href = a.get("href") or ""
-            if href.startswith("http"):
-                url = href
-            else:
-                url = f"{self.BASE_URL}{href}"
-
-            title_el = a.select_one(".search-results__job-title")
-            title = (
-                title_el.get_text(strip=True)
-                if title_el is not None
-                else a.get_text(strip=True)
-            )
-
-            loc_el = li.select_one(".search-results__job-info.location")
-            date_el = li.select_one(".search-results__job-info.date")
-            raw_location = loc_el.get_text(strip=True) if loc_el else ""
-            post_date = date_el.get_text(strip=True) if date_el else ""
-
-            results.append(
-                {
-                    "Posting ID": job_id,
-                    "Detail URL": url,
-                    "Position Title": title,
-                    "Raw Location": raw_location,
-                    "Post Date": post_date,
-                }
-            )
-
-        return results
-
-    # -------------------------------------------------------------------------
-    # Lifecycle
-    # -------------------------------------------------------------------------
     def fetch_data(self) -> List[Dict[str, str]]:
-        """
-        Collect job links/IDs from all relevant search-results pages.
+        resp = self.get(self.SITEMAP_URL)
+        resp.raise_for_status()
 
-        Returns:
-            List of shallow listing dicts, each suitable for `parse_job`.
-        """
-        total_pages = self.get_total_pages()
-        self.log("list:pages", total_pages=total_pages)
+        entries = parse_sitemap_xml(
+            resp.content,
+            url_filter=lambda loc: "/job/" in loc,
+        )
+
+        urls = [e["loc"] for e in entries]
 
         if getattr(self, "testing", False):
-            # --limit for test runs
             try:
                 job_limit = int(getattr(self, "test_limit", 15)) or 0
             except Exception:
                 job_limit = 15
         else:
-            job_limit = float("inf")  # type: ignore[assignment]
-            if self.max_pages:
-                total_pages = min(total_pages, self.max_pages)
+            job_limit = float("inf")
 
-        all_job_links: List[Dict[str, str]] = []
-        for page_num in range(1, total_pages + 1):
-            page_links = self.get_job_links(page_num)
-            self.log("list:fetched", page=page_num, count=len(page_links))
+        if job_limit and job_limit != float("inf"):
+            urls = urls[: int(job_limit)]
 
-            for link in page_links:
-                if len(all_job_links) >= job_limit:
-                    break
-                all_job_links.append(link)
+        jobs: List[Dict[str, str]] = []
+        seen_urls = set()
 
-            sleep(self.delay)
+        for url in urls:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
 
-            if len(all_job_links) >= job_limit:
-                self.log("list:done", reason="test_limit")
-                break
+            posting_id = self._extract_posting_id(url)
+            jobs.append(
+                {
+                    "Posting ID": posting_id,
+                    "Detail URL": url,
+                }
+            )
 
-        return all_job_links
+        self.log("list:sitemap", total_urls=len(urls), unique=len(jobs))
+        self.log("list:done", total=len(jobs))
+        return jobs
 
-    # -------------------------------------------------------------------------
-    # Detail parsing
-    # -------------------------------------------------------------------------
+    @staticmethod
+    def _extract_posting_id(url: str) -> str:
+        path = urlparse(url).path.rstrip("/")
+        return path.split("/")[-1]
+
     def parse_job(self, job_entry: Dict[str, str]) -> Dict[str, Any]:
-        """
-        Fetch and normalize a single Boeing job posting.
-
-        Args:
-            job_entry: Listing dict from `fetch_data` / `get_job_links`.
-
-        Returns:
-            Flattened record with canonical fields (Position Title, Posting ID,
-            location, business/sector, description, etc.).
-        """
         url = job_entry.get("Detail URL") or ""
         if not url:
             raise ValueError("Missing Detail URL in job_entry")
@@ -279,7 +122,6 @@ class BoeingScraper(JobScraper):
         if not description:
             description = jsonld.get("description") or ""
 
-        # Employment type as a stand-in clearance-ish field if you want parity
         employment_type = jsonld.get("employmentType")
 
         record: Dict[str, Any] = {
