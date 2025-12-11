@@ -17,3 +17,9 @@ To open backend on CMD:
 cd to site_by_site
 conda activate job_scraper
 python api/app.py
+
+To add a new scraper:
+
+1. Add scraper name/info to const SCRAPERS in jobs-ui/src/App.jsx
+2. Create [insert scraper name]_scraper.py in site_by_site/scrapers
+3. Fill in scraper logic, minimally implementing a subclass of JobScraper and overriding the parse_job and fetch_data methods

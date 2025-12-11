@@ -54,6 +54,14 @@ export default function JobsPage() {
           params.set("since", filters.since);
         }
 
+        // Sorting: send to backend so it can sort globally
+        if (sortField) {
+          params.set("sort_field", sortField);
+        }
+        if (sortDirection) {
+          params.set("sort_dir", sortDirection);
+        }
+
         const path = `/jobs?${params.toString()}`;
         const data = await apiGet(path);
 
@@ -77,7 +85,15 @@ export default function JobsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, filters.vendor, filters.searchTerm, filters.since]);
+    }, [
+      page,
+      filters.vendor,
+      filters.searchTerm,
+      filters.since,
+      sortField,
+      sortDirection,
+    ]);
+
 
   const canGoPrev = page > 0 && !isLoading;
   const canGoNext = jobs.length === PAGE_SIZE && !isLoading; // assume no more if < 50
@@ -100,44 +116,7 @@ export default function JobsPage() {
   const hasActiveFilters =
     !!(filters.vendor || filters.searchTerm || filters.since);
 
-  const sortedJobs = (() => {
-    const out = [...jobs];
-    if (!sortField) return out;
-
-    const compareStrings = (aVal, bVal) => {
-      const sa = (aVal || "").toLowerCase();
-      const sb = (bVal || "").toLowerCase();
-      if (sa < sb) return sortDirection === "asc" ? -1 : 1;
-      if (sa > sb) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    };
-
-    if (sortField === "title") {
-      out.sort((a, b) =>
-        compareStrings(a["Position Title"], b["Position Title"])
-      );
-    } else if (sortField === "date") {
-      out.sort((a, b) => {
-        const da = a["Post Date"] ? new Date(a["Post Date"]) : null;
-        const db = b["Post Date"] ? new Date(b["Post Date"]) : null;
-        const ta = da ? da.getTime() : 0;
-        const tb = db ? db.getTime() : 0;
-        if (ta < tb) return sortDirection === "asc" ? -1 : 1;
-        if (ta > tb) return sortDirection === "asc" ? 1 : -1;
-        return 0;
-      });
-    } else if (sortField === "location") {
-      out.sort((a, b) => {
-        const aLoc = a["Raw Location"] || a.City || a.State || "";
-        const bLoc = b["Raw Location"] || b.City || b.State || "";
-        return compareStrings(aLoc, bLoc);
-      });
-    } else if (sortField === "company") {
-      out.sort((a, b) => compareStrings(a.Vendor, b.Vendor));
-    }
-
-    return out;
-  })();
+  const visibleJobs = jobs; // already sorted by backend
 
   const handleSort = (field) => {
     setSortField((prevField) => {
@@ -325,8 +304,8 @@ export default function JobsPage() {
                     </td>
                   </tr>
                 ))
-              : // ---------- Real rows (sorted client-side) ----------
-                sortedJobs.map((job, idx) => {
+              : // ---------- Real rows (sorted server-side) ----------
+                visibleJobs.map((job, idx) => {
                   const key =
                     job["Posting ID"] ??
                     job["Detail URL"] ??

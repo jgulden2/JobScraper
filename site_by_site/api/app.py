@@ -140,8 +140,26 @@ def list_jobs():
             )
         )
 
-    # Simple ordering (SQLite doesn't support NULLS LAST directly)
-    stmt = stmt.order_by(sa.desc(jobs.c["Post Date"])).limit(limit).offset(offset)
+        # ----- Sorting -----
+    sort_field = request.args.get("sort_field", "date")
+    sort_dir = request.args.get("sort_dir", "desc")
+
+    # Map allowed sort fields to actual columns
+    sort_columns = {
+        "date": jobs.c["Post Date"],
+        "title": jobs.c["Position Title"],
+        "location": jobs.c["Raw Location"],
+        "company": jobs.c.Vendor,
+    }
+
+    sort_col = sort_columns.get(sort_field, jobs.c["Post Date"])
+    if sort_dir == "asc":
+        stmt = stmt.order_by(sa.asc(sort_col))
+    else:
+        # default to desc
+        stmt = stmt.order_by(sa.desc(sort_col))
+
+    stmt = stmt.limit(limit).offset(offset)
 
     with engine.begin() as conn:
         rows = conn.execute(stmt).mappings().all()

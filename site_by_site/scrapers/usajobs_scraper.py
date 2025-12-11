@@ -20,10 +20,9 @@ class USAJOBSScraper(JobScraper):
       3) Map fields into our canonical schema; JobScraper handles the rest.
     """
 
-    # This is what will be stored in "Vendor" in the DB and shown in the UI.
     VENDOR = "USAJOBS"
 
-    API_BASE = "https://data.usajobs.gov/api"  # adjust if needed
+    API_BASE = "https://data.usajobs.gov/api"
 
     def __init__(self) -> None:
         user_agent = os.getenv("USAJOBS_USER_AGENT", "")
@@ -45,10 +44,6 @@ class USAJOBSScraper(JobScraper):
     def fetch_data(self) -> List[Dict[str, Any]]:
         """
         Call the USAJOBS search API and return a list of raw listing dicts.
-
-        We'll respect self.testing / self.test_limit by truncating the
-        collected list, but USAJOBS also supports "ResultsPerPage" so you
-        can size pages appropriately.
         """
         jobs: List[Dict[str, Any]] = []
 
@@ -65,7 +60,6 @@ class USAJOBSScraper(JobScraper):
             params = {
                 "ResultsPerPage": per_page,
                 "Page": page,
-                # Optional but nice: return full field set instead of summary
                 "Fields": "full",
             }
 
@@ -129,7 +123,6 @@ class USAJOBSScraper(JobScraper):
         # Salary text lives in UserArea.Details.Salary
         details = (descriptor.get("UserArea") or {}).get("Details") or {}
         salary_raw = details.get("Salary")
-        # Min/max aren't directly exposed; you can later parse from salary_raw if desired
         salary_min = None
         salary_max = None
 
@@ -158,9 +151,7 @@ class USAJOBSScraper(JobScraper):
             "Postal Code": loc0.get("PostalCode"),
             "Full Time Status": descriptor.get("PositionSchedule"),
             "Job Category": descriptor.get("JobCategory"),
-            "Required Skills": details.get(
-                "RequiredDocuments"
-            )  # very loose; you can refine
+            "Required Skills": details.get("RequiredDocuments")
             or descriptor.get("QualificationSummary"),
         }
 
