@@ -14,10 +14,9 @@ def _normalize_sitemap_text(xml_text: Union[str, bytes]) -> str:
     """
     if isinstance(xml_text, bytes):
         # Decode as UTF-8 with BOM support
-        return xml_text.decode("utf-8-sig", errors="replace")
-
-    # xml_text is already a str
-    text = xml_text
+        text = xml_text.decode("utf-8-sig", errors="replace")
+    else:
+        text = xml_text
 
     # Case 1: proper BOM (U+FEFF) at start
     if text.startswith("\ufeff"):
@@ -37,20 +36,9 @@ def parse_sitemap_xml(
     url_filter: Optional[Callable[[str], bool]] = None,
 ) -> List[Dict[str, str]]:
     """
-    Parse a standard XML sitemap and return a list of dicts with at least:
+    Parse a standard XML sitemap (<urlset>) and return a list of dicts:
 
         {"loc": "<url>", "lastmod": "<iso8601 or ''>"}
-
-    Args:
-        xml_text: Raw XML string or bytes.
-        url_filter: Optional predicate; if provided, only keep URLs for which
-                    url_filter(loc) returns True.
-
-    Returns:
-        List of {"loc": ..., "lastmod": ...} dictionaries.
-
-    Raises:
-        xml.etree.ElementTree.ParseError: If the XML itself is malformed.
     """
     text = _normalize_sitemap_text(xml_text)
     root = ET.fromstring(text)
@@ -80,6 +68,61 @@ def parse_sitemap_xml(
             continue
 
         lastmod_el = url_el.find(lastmod_tag, ns)
+        lastmod = (
+            lastmod_el.text.strip()
+            if lastmod_el is not None and lastmod_el.text
+            else ""
+        )
+
+        results.append({"loc": loc, "lastmod": lastmod})
+
+    return results
+
+
+def parse_sitemap_index(
+    xml_text: Union[str, bytes],
+    url_filter: Optional[Callable[[str], bool]] = None,
+) -> List[Dict[str, str]]:
+    """
+    Parse a sitemap *index* (<sitemapindex>) and return a list of dicts:
+
+        {"loc": "<sitemap_url>", "lastmod": "<iso8601 or ''>"}
+
+    Args:
+        xml_text: Raw XML bytes/string of the sitemap index.
+        url_filter: Optional predicate to filter sitemap URLs by loc.
+
+    Returns:
+        List of {"loc": ..., "lastmod": ...} dictionaries.
+    """
+    text = _normalize_sitemap_text(xml_text)
+    root = ET.fromstring(text)
+
+    # Handle namespace if present
+    if root.tag.startswith("{"):
+        uri = root.tag.split("}")[0].strip("{")
+        ns = {"sm": uri}
+        sitemap_xpath = ".//sm:sitemap"
+        loc_tag = "sm:loc"
+        lastmod_tag = "sm:lastmod"
+    else:
+        ns = {}
+        sitemap_xpath = ".//sitemap"
+        loc_tag = "loc"
+        lastmod_tag = "lastmod"
+
+    results: List[Dict[str, str]] = []
+
+    for sm_el in root.findall(sitemap_xpath, ns):
+        loc_el = sm_el.find(loc_tag, ns)
+        if loc_el is None or not loc_el.text:
+            continue
+        loc = loc_el.text.strip()
+
+        if url_filter is not None and not url_filter(loc):
+            continue
+
+        lastmod_el = sm_el.find(lastmod_tag, ns)
         lastmod = (
             lastmod_el.text.strip()
             if lastmod_el is not None and lastmod_el.text

@@ -1,185 +1,123 @@
-"""
-Raytheon Technologies (RTX) scraper.
-
-Uses Selenium (undetected-chromedriver) to load dynamic content from
-careers.rtx.com, extract the `phApp.ddo` data object for listings,
-and then fetch detailed job information via requests.
-"""
-
 from __future__ import annotations
 
-import os
-import time
-import undetected_chromedriver as uc
-from selenium.webdriver.support.ui import WebDriverWait
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 from scrapers.base import JobScraper
-from utils.extractors import extract_phapp_ddo, extract_total_results
 from utils.detail_fetchers import fetch_detail_artifacts
-
-
-# -------------------------------------------------------------------------
-# Suppress noisy undetected_chromedriver destructor logs on Windows
-# -------------------------------------------------------------------------
-if os.name == "nt" and os.environ.get("RTX_SILENCE_UC_DEL", "1") == "1":
-    try:
-
-        def noop(self) -> None:
-            return None
-
-        uc.Chrome.__del__ = noop
-    except Exception:
-        pass
+from utils.sitemap import parse_sitemap_index, parse_sitemap_xml
 
 
 class RTXScraper(JobScraper):
-    """
-    Scraper for Raytheon Technologies (RTX) job listings.
-
-    Workflow:
-      1) Load search-results pages with undetected_chromedriver (UC) to capture
-         dynamically populated job data from the global `phApp.ddo` variable.
-      2) Extract job listings from the `eagerLoadRefineSearch` JSON.
-      3) For each job, optionally fetch job detail pages for enrichment.
-    """
-
-    # Used by the base pipeline for CSV/DB exports and incremental skip checks
     VENDOR = "RTX"
 
+    BASE_URL = "https://careers.rtx.com"
+    SEARCH_URL = f"{BASE_URL}/global/en/search-results"
+    SITEMAP_INDEX_URL = f"{BASE_URL}/global/en/sitemap_index.xml"
+
     def __init__(self) -> None:
-        """
-        Initialize the RTX scraper with base URL, headers, and Selenium templates.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
         super().__init__(
-            base_url="https://careers.rtx.com/global/en/search-results",
+            base_url=self.SEARCH_URL,
             headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/115.0.0.0 Safari/537.36"
+                ),
                 "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                    "image/webp,*/*;q=0.8"
+                ),
                 "Connection": "keep-alive",
             },
         )
-        self.search_url_template = (
-            "https://careers.rtx.com/global/en/search-results?from={offset}&s=1"
-        )
-        self.job_detail_url_template = "https://careers.rtx.com/global/en/job/{job_id}/"
-        self.page_size = 10
 
     # -------------------------------------------------------------------------
-    # Fetch listings
+    # Listing via sitemap index
     # -------------------------------------------------------------------------
     def fetch_data(self) -> List[Dict[str, Any]]:
-        """
-        Retrieve all job listings from RTX Careers search-results.
-
-        Returns:
-            A list of job listing dictionaries from `phApp.ddo['jobs']`.
-
-        Raises:
-            requests.RequestException: If network communication fails.
-            ValueError: If the `phApp.ddo` data cannot be found or parsed.
-        """
+        # Determine job limit in testing vs normal mode
         if getattr(self, "testing", False):
             try:
                 job_limit = int(getattr(self, "test_limit", 15)) or 0
             except Exception:
                 job_limit = 15
         else:
-            job_limit = float("inf")
-        all_jobs: List[Dict[str, Any]] = []
-        offset = 0
+            job_limit = float("inf")  # type: ignore[assignment]
 
-        options = uc.ChromeOptions()
-        options.add_argument("--window-size=1920,1200")
-        options.add_argument("--no-sandbox")
+        # 1) Load sitemap index
+        self.log("sitemap_index:fetch", url=self.SITEMAP_INDEX_URL)
+        index_resp = self.get(self.SITEMAP_INDEX_URL)
+        index_resp.raise_for_status()
 
-        self.log("driver:init")
-        driver = uc.Chrome(options=options)
+        sitemap_entries = parse_sitemap_index(index_resp.content)
+        sitemap_urls = [e["loc"] for e in sitemap_entries]
 
-        try:
-            first_page_url = "https://careers.rtx.com/global/en/search-results"
-            driver.get(first_page_url)
+        self.log("sitemap_index:parsed", count=len(sitemap_urls))
 
-            self.log("driver:wait", target="phApp.ddo")
-            WebDriverWait(driver, 30).until(
-                lambda d: d.execute_script("return window.phApp && window.phApp.ddo;")
+        # 2) Walk each sitemap and collect job URLs
+        all_urls: List[str] = []
+        seen_urls = set()
+
+        for sm_url in sitemap_urls:
+            self.log("sitemap:fetch", url=sm_url)
+            sm_resp = self.get(sm_url)
+            sm_resp.raise_for_status()
+
+            url_entries = parse_sitemap_xml(
+                sm_resp.content,
+                url_filter=lambda loc: "/job/" in loc,
             )
-            phapp_data: Dict[str, Any] = driver.execute_script(
-                "return window.phApp.ddo;"
-            )
+            for entry in url_entries:
+                loc = entry["loc"]
+                if loc in seen_urls:
+                    continue
+                seen_urls.add(loc)
+                all_urls.append(loc)
 
-            total_results = extract_total_results(phapp_data)
-            self.log("source:total", total=total_results)
-
-            jobs: List[dict[str, Any]] = (
-                phapp_data.get("eagerLoadRefineSearch", {})
-                .get("data", {})
-                .get("jobs", [])
-            )
-            for job in jobs:
-                if len(all_jobs) >= job_limit:
-                    break
-                all_jobs.append(job)
-
-            if len(all_jobs) >= job_limit:
-                self.log("list:done", reason="test_limit_initial")
-                return all_jobs
-
-            self.log("list:fetched", count=len(jobs), offset=0)
-            offset += self.page_size
-
-            while offset < total_results:
-                if len(all_jobs) >= job_limit:
-                    break
-                page_url = f"https://careers.rtx.com/global/en/search-results?from={offset}&s=1"
-                driver.get(page_url)
-                html = driver.page_source
-                phapp_data = extract_phapp_ddo(html)
-
-                jobs = (
-                    phapp_data.get("eagerLoadRefineSearch", {})
-                    .get("data", {})
-                    .get("jobs", [])
-                )
-                if not jobs:
-                    self.log("list:done", reason="empty")
+                if len(all_urls) >= job_limit and job_limit != float("inf"):
                     break
 
-                for job in jobs:
-                    if len(all_jobs) >= job_limit:
-                        break
-                    all_jobs.append(job)
+            self.log("sitemap:parsed", sitemap=sm_url, urls=len(url_entries))
 
-                self.log("list:fetched", count=len(jobs), offset=offset)
-                offset += self.page_size
-                time.sleep(1)
+            if len(all_urls) >= job_limit and job_limit != float("inf"):
+                break
 
-        finally:
-            self.log("driver:quit")
-            driver.quit()
+        self.log("list:sitemap", total_urls=len(all_urls))
 
-        self.log("list:done", reason="end")
-        return all_jobs
+        # 3) Convert URLs into minimal listing dicts
+        jobs: List[Dict[str, Any]] = []
+        for url in all_urls:
+            job_id = self._extract_job_id(url)
+            jobs.append(
+                {
+                    "Posting ID": job_id,
+                    "Detail URL": url,
+                }
+            )
+
+        self.log("list:done", total=len(jobs))
+        return jobs
+
+    @staticmethod
+    def _extract_job_id(url: str) -> str:
+        path_parts = urlparse(url).path.rstrip("/").split("/")
+        if len(path_parts) >= 2:
+            return path_parts[-2]
+        return path_parts[-1]
 
     # -------------------------------------------------------------------------
-    # Parse job
+    # Detail parsing
     # -------------------------------------------------------------------------
     def parse_job(self, raw_job: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Convert listing to a minimal record + artifacts for canonicalization.
-        """
-        job_id = raw_job.get("jobId")
-        detail_url = self.job_detail_url_template.format(job_id=job_id)
+        # Detail URL and job ID
+        detail_url = raw_job.get("Detail URL") or ""
+        if not detail_url:
+            raise ValueError("Missing Detail URL in raw_job")
+
+        job_id = raw_job.get("Posting ID") or self._extract_job_id(detail_url)
+
         artifacts = fetch_detail_artifacts(
             self.thread_get,
             self.log,
@@ -187,27 +125,56 @@ class RTXScraper(JobScraper):
             get_datalayer=False,
             get_meta=False,
         )
-        jsonld = artifacts.get("_jsonld")
-        phapp = artifacts.get("_vendor_blob")
+        jsonld: Dict[str, Any] = artifacts.get("_jsonld") or {}
+        phapp: Dict[str, Any] = artifacts.get("_vendor_blob") or {}
+        canonical_url = artifacts.get("_canonical_url") or detail_url
+
+        position_title = phapp.get("title") or jsonld.get("title")
+
+        description = jsonld.get("description") or phapp.get("description")
+
+        raw_location = phapp.get("address") or phapp.get("location")
+
+        employment_type = phapp.get("type") or jsonld.get("employmentType")
+
+        remote_status = phapp.get("locationType")
+
+        state = phapp.get("state")
+        city = phapp.get("city")
+        country = phapp.get("country")
+        latitude = phapp.get("latitude")
+        longitude = phapp.get("longitude")
+
+        career_level = phapp.get("experienceLevel")
+        post_date = phapp.get("postedDate")
+        job_category = phapp.get("category")
+
+        postal_code = jsonld.get("jobLocation.0.address.postalCode")
+        hours_per_week = jsonld.get("workHours")
+
+        business_area = phapp.get("businessUnit")
+        relocation_available = phapp.get("relocationEligible")
+        clearance_must_possess = phapp.get("clearanceType")
+
         return {
-            "Position Title": raw_job.get("title"),
-            "Description": jsonld.get("description"),
-            "Raw Location": raw_job.get("address") or raw_job.get("location"),
+            "Position Title": position_title,
+            "Description": description,
+            "Raw Location": raw_location,
             "Posting ID": job_id,
-            "Detail URL": artifacts.get("_canonical_url") or detail_url,
-            "Full Time Status": raw_job.get("type"),
-            "Remote Status": raw_job.get("locationType"),
-            "State": raw_job.get("state"),
-            "City": raw_job.get("city"),
-            "Latitude": raw_job.get("latitude"),
-            "Longitude": raw_job.get("longitude"),
-            "Career Level": raw_job.get("experienceLevel"),
-            "Country": raw_job.get("country"),
-            "Post Date": raw_job.get("postedDate"),
-            "Job Category": raw_job.get("category"),
-            "Postal Code": jsonld.get("jobLocation.0.address.postalCode"),
-            "Hours Per Week": jsonld.get("workHours"),
-            "Business Area": phapp.get("businessUnit"),
-            "Relocation Available": phapp.get("relocationEligible"),
-            "Clearance Level Must Possess": phapp.get("clearanceType"),
+            "Detail URL": canonical_url,
+            "Full Time Status": employment_type,
+            "Remote Status": remote_status,
+            "State": state,
+            "City": city,
+            "Latitude": latitude,
+            "Longitude": longitude,
+            "Career Level": career_level,
+            "Country": country,
+            "Post Date": post_date,
+            "Job Category": job_category,
+            "Postal Code": postal_code,
+            "Hours Per Week": hours_per_week,
+            "Business Area": business_area,
+            "Relocation Available": relocation_available,
+            "Clearance Level Must Possess": clearance_must_possess,
         }
