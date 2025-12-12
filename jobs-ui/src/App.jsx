@@ -66,6 +66,8 @@ const SCRAPERS = [
   { id: "usajobs", label: "USAJOBS" },
   { id: "boeing", label: "Boeing" },
   { id: "l3harris", label: "L3Harris" },
+  { id: "hii", label: "HII" },
+  { id: "leidos", label: "Leidos" },
 ];
 
 function AdminScrapePage({ showToast }) {
