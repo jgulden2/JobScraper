@@ -68,6 +68,8 @@ const SCRAPERS = [
   { id: "l3harris", label: "L3Harris" },
   { id: "hii", label: "HII" },
   { id: "leidos", label: "Leidos" },
+  { id: "thales", label: "Thales" },
+  { id: "boozallen", label: "Booz Allen" },
 ];
 
 function AdminScrapePage({ showToast }) {
