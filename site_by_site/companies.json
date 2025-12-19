@@ -1,7 +1,217 @@
 {
+  "UnitedHealth Group": {
+    "website": "https://www.unitedhealthgroup.com/",
+    "careers": "https://www.unitedhealthgroup.com/careers/en/work",
+    "search": "https://careers.unitedhealthgroup.com/job-search-results/"
+  },
+  "McKesson": {
+    "website": "https://www.mckesson.com/",
+    "careers": "https://careers.mckesson.com/en",
+    "search": "https://careers.mckesson.com/en/search-jobs"
+  },
+  "TriWest": {
+    "website": "https://www.triwest.com/",
+    "careers": "https://www.triwest.com/en/careers/",
+    "search": "https://recruiter.triwest.com/psc/hrprdcg/EMPLOYEE/HRMS/c/HRS_HRAM_FL.HRS_CG_SEARCH_FL.GBL?Page=HRS_APP_SCHJOB_FL&Action=U"
+  },
+  "Humana": {
+    "website": "https://www.humana.com/",
+    "careers": "https://careers.humana.com/us/en",
+    "search": "https://careers.humana.com/us/en/search-results"
+  },
+  "Amentum": {
+    "website": "https://www.amentum.com/",
+    "careers": "https://www.amentumcareers.com/",
+    "search": "https://www.amentumcareers.com/jobs/search"
+  },
+  "ANSER": {
+    "website": "https://www.anser.org/",
+    "careers": "https://www.anser.org/careers",
+    "search": "https://www.anser.org/career/list"
+  },
+  "Honeywell": {
+    "website": "https://www.honeywell.com/us/en",
+    "careers": "https://careers.honeywell.com/en/sites/Honeywell",
+    "search": "https://careers.honeywell.com/en/sites/Honeywell/jobs"
+  },
   "CACI": {
     "website": "https://www.caci.com/",
     "careers": "https://careers.caci.com/global/en/",
     "search": "https://careers.caci.com/global/en/search-results"
+  },
+  "GE Aerospace": {
+    "website": "https://www.geaerospace.com/",
+    "careers": "https://careers.geaerospace.com/global/en",
+    "search": "https://careers.geaerospace.com/global/en/search-results"
+  },
+  "ADS": {
+    "website": "https://www.adsinc.com/",
+    "careers": "https://www.adsinc.com/careers",
+    "search": "https://recruiting.ultipro.com/ADS1000/JobBoard/c2e01e48-e5fb-42a2-ab94-971562a3279b/"
+  },
+  "AECOM": {
+    "website": "https://aecom.com/",
+    "careers": "https://aecom.com/careers/",
+    "search": "https://aecom.jobs/"
+  },
+  "Los Alamos National Laboratory": {
+    "website": "https://www.lanl.gov/",
+    "careers": "https://lanl.jobs/",
+    "search": "https://lanl.jobs/search/searchjobs"
+  },
+  "Fluor": {
+    "website": "https://www.fluor.com/",
+    "careers": "https://www.fluor.com/careers",
+    "search": "https://careers.fluor.com/careers"
+  },
+  "Peraton": {
+    "website": "https://www.peraton.com/",
+    "careers": "https://www.careers.peraton.com/",
+    "search": "https://www.careers.peraton.com/search-jobs"
+  },
+  "SAIC": {
+    "website": "https://www.saic.com/",
+    "careers": "https://jobs.saic.com/",
+    "search": "https://jobs.saic.com/search/jobs"
+  },
+  "Centene": {
+    "website": "https://www.centene.com/",
+    "careers": "https://jobs.centene.com/us/en/",
+    "search": "https://jobs.centene.com/us/en/jobs/"
+  },
+  "V2X": {
+    "website": "https://gov2x.com/",
+    "careers": "https://gov2x.com/careers/",
+    "search": "https://careers.gov2x.com/why-gov2x/jobs"
+  },
+  "V2X Aerospace": {
+    "website": "https://gov2x.com/",
+    "careers": "https://gov2x.com/careers/",
+    "search": "https://recruiting2.ultipro.com/VER1018VALLC/JobBoard/ea4d56d0-a413-48c6-87f7-32d00fd2eef4/"
+  },
+  "Y-12": {
+    "website": "https://www.y12.doe.gov/",
+    "careers": "https://www.y12.doe.gov/careers/",
+    "search": "https://career-hcm03.ns2cloud.com/career?company=CNSHCM03&career%5fns=job%5flisting%5fsummary&navBarLevel=JOB%5fSEARCH&_s.crb=jKOvgOYsqW4%2fxtAoG2hDpa%2f1AUizq6gVAtW6eDjiBMU%3d"
+  },
+  "Jacobs": {
+    "website": "https://www.jacobs.com/",
+    "careers": "https://www.jacobs.com/careers-jacobs",
+    "search": "https://careers.jacobs.com/en_US/careers/SearchJobs/"
+  },
+  "Pfizer": {
+    "website": "https://www.pfizer.com/",
+    "careers": "https://www.pfizer.com/about/careers",
+    "search": "https://www.pfizer.com/about/careers/search-results"
+  },
+  "SpaceX": {
+    "website": "https://www.spacex.com/",
+    "careers": "https://www.spacex.com/careers",
+    "search": "https://www.spacex.com/careers/jobs"
+  },
+  "KBR": {
+    "website": "https://www.kbr.com/en",
+    "careers": "https://careers.kbr.com/us/en",
+    "search": "https://careers.kbr.com/us/en/search-results"
+  },
+  "Dell": {
+    "website": "https://www.dell.com/en-us",
+    "careers": "https://jobs.dell.com/en",
+    "search": "https://jobs.dell.com/en/search-jobs"
+  },
+  "Parsons": {
+    "website": "https://www.parsons.com/",
+    "careers": "https://jobs.parsons.com/",
+    "search": "https://jobs.parsons.com/career-search"
+  },
+  "Accenture": {
+    "website": "https://www.accenture.com/us-en",
+    "careers": "https://www.accenture.com/us-en/careers",
+    "search": "https://www.accenture.com/us-en/careers/jobsearch"
+  },
+  "Lawrence Livermore National Laboratory": {
+    "website": "https://www.llnl.gov/",
+    "careers": "https://www.llnl.gov/join-our-team/careers",
+    "search": "https://www.llnl.gov/join-our-team/careers/find-your-job"
+  },
+  "Caltech": {
+    "website": "https://www.caltech.edu/",
+    "careers": "https://hr.caltech.edu/careers",
+    "search": "https://phf.tbe.taleo.net/phf03/ats/careers/v2/searchResults"
+  },
+  "Textron": {
+    "website": "https://www.textron.com/",
+    "careers": "https://careers.textron.com/",
+    "search": "https://careers.textron.com/jobs/"
+  },
+  "Oak Ridge National Laboratory": {
+    "website": "https://www.ornl.gov/",
+    "careers": "https://jobs.ornl.gov/",
+    "search": "https://jobs.ornl.gov/search/"
+  },
+  "Savannah River Nuclear Solutions": {
+    "website": "https://www.savannahrivernuclearsolutions.com/",
+    "careers": "https://www.savannahrivernuclearsolutions.com/careers/careers.htm",
+    "search": "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=25264&siteid=5259#keyWordSearch="
+  },
+  "General Atomics": {
+    "website": "https://www.ga.com/",
+    "careers": "https://www.ga.com/careers/",
+    "search": "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=25539&siteid=5313#keyWordSearch"
+  },
+  "Battelle": {
+    "website": "https://www.battelle.org/",
+    "careers": "https://www.battelle.org/careers",
+    "search": "https://jobs.battelle.org/us/en/search-results"
+  },
+  "Cencora": {
+    "website": "https://www.cencora.com/",
+    "careers": "https://careers.cencora.com/us/en",
+    "search": "https://careers.cencora.com/us/en/search-results"
+  },
+  "Idaho National Laboratory": {
+    "website": "https://inl.gov/",
+    "careers": "https://inl.gov/careers/",
+    "search": "https://inl.taleo.net/careersection/inl_external/jobsearch.ftl"
+  },
+  "Oshkosh": {
+    "website": "https://www.oshkoshcorp.com/",
+    "careers": "https://www.oshkoshcorp.com/careers",
+    "search": "https://careers.oshkoshcorp.com/us/en/search-results"
+  },
+  "Merck": {
+    "website": "https://www.merck.com/",
+    "careers": "https://jobs.merck.com/us/en",
+    "search": "https://jobs.merck.com/us/en/search-results"
+  },
+  "Johns Hopkins University": {
+    "website": "https://www.jhu.edu/",
+    "careers": "https://careers.jhu.edu/",
+    "search": "https://hiring.jhu.edu/careers"
+  },
+  "SNC": {
+    "website": "https://www.sncorp.com/",
+    "careers": "https://www.sncorp.com/careers/",
+    "search": "https://snc.wd1.myworkdayjobs.com/SNC_External_Career_Site/"
+  },
+  "Maximus": {
+    "website": "https://maximus.com/",
+    "careers": "https://maximus.avature.net/careers/USHome",
+    "search": "https://maximus.avature.net/careers/Job-Search_US"
+  },
+  "Palantir": {
+    "website": "https://www.palantir.com/",
+    "careers": "https://www.palantir.com/careers/",
+    "search": "https://www.palantir.com/careers/open-positions/"
+  },
+  "BWXT": {
+    "website": "https://www.bwxt.com/",
+    "careers": "https://www.bwxt.com/careers/",
+    "search": "https://careers.bwxt.com/search/"
+  },
+  "StoneX": {
+    "website": "https://www.stonex.com/en/",
+    "careers": "https://www.stonex.com/en/about/careers/",
+    "search": "https://www.stonex.com/en/about/careers/jobs/"
   }
 }
