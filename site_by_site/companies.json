@@ -213,5 +213,405 @@
     "website": "https://www.stonex.com/en/",
     "careers": "https://www.stonex.com/en/about/careers/",
     "search": "https://www.stonex.com/en/about/careers/jobs/"
+  },
+  "Curtiss-Wright": {
+    "website": "https://curtisswright.com/",
+    "careers": "https://curtisswright.com/careers",
+    "search": "https://curtisswright.wd1.myworkdayjobs.com/CW_External_Career_Site"
+  },
+  "Parker": {
+    "website": "https://www.parker.com/us/en/home.html",
+    "careers": "https://www.parker.com/us/en/careers.html",
+    "search": "https://parkercareers.ttcportals.com/jobs/search"
+  },
+  "Leonardo": {
+    "website": "https://www.leonardo.com/en/home",
+    "careers": "https://www.leonardo.com/en/careers",
+    "search": "https://careers.leonardodrs.com/search/?createNewAlert=false&q=&locationsearch=&optionsFacetsDD_country=&optionsFacetsDD_state=&optionsFacetsDD_customfield1="
+  },
+  "Fedex": {
+    "website": "https://www.fedex.com/en-us/home.html",
+    "careers": "https://careers.fedex.com/",
+    "search": "https://careers.fedex.com/jobs"
+  },
+  "Austal": {
+    "website": "https://www.austal.com/",
+    "careers": "https://www.austaljobs.com/",
+    "search": "https://www.austaljobs.com/usa"
+  },
+  "MIT": {
+    "website": "https://www.mit.edu/",
+    "careers": "https://hr.mit.edu/jobs",
+    "search": "https://careers.peopleclick.com/careerscp/client_mit/external/results/searchResult.html"
+  },
+  "Mantech": {
+    "website": "https://www.mantech.com/",
+    "careers": "https://www.mantech.com/careers/why-mantech/",
+    "search": "https://mantech.avature.net/en_US/careers/"
+  },
+  "Arctic Slope": {
+    "website": "https://www.asrc.com/",
+    "careers": "",
+    "search": "https://careers.asrc.com/jobs/search/"
+  },
+  "Mitre": {
+    "website": "https://www.mitre.org/",
+    "careers": "https://www.mitre.org/careers",
+    "search": "https://careers.mitre.org/us/en/search-results"
+  },
+  "Chemonics": {
+    "website": "https://www.chemonics.com/",
+    "careers": "https://www.chemonics.com/careers/",
+    "search": "https://phh.tbe.taleo.net/phh02/ats/careers/v2/searchResults"
+  },
+  "Viasat": {
+    "website": "https://www.viasat.com/",
+    "careers": "https://careers.viasat.com/",
+    "search": "https://careers.viasat.com/jobs"
+  },
+  "Microsoft": {
+    "website": "https://www.microsoft.com/en-us/",
+    "careers": "https://careers.microsoft.com/v2/global/en/home.html",
+    "search": "https://apply.careers.microsoft.com/careers"
+  },
+  "SLSCO": {
+    "website": "https://www.slsco.com/",
+    "careers": "https://www.slsco.com/careers",
+    "search": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=871d089f-05e3-40e7-b9fc-9f432c673422&ccId=9200157727740_2&lang=en_US&selectedMenuKey=CareerCenter"
+  },
+  "AT&T": {
+    "website": "https://www.att.com/",
+    "careers": "https://www.att.jobs/",
+    "search": "https://www.att.jobs/search-jobs"
+  },
+  "Aerospace": {
+    "website": "https://aerospace.org/",
+    "careers": "https://aerospace.org/careers",
+    "search": "https://aero.wd5.myworkdayjobs.com/External"
+  },
+  "Moog": {
+    "website": "https://www.moog.com/",
+    "careers": "https://www.moog.com/careers.html",
+    "search": "https://moog.wd5.myworkdayjobs.com/MOOG_External_Career_Site"
+  },
+  "Keysight": {
+    "website": "https://www.keysight.com/us/en/home.html",
+    "careers": "https://jobs.keysight.com/external",
+    "search": "https://jobs.keysight.com/external/jobs"
+  },
+  "CDW": {
+    "website": "https://www.cdw.com/",
+    "careers": "https://www.cdwjobs.com/",
+    "search": "https://www.cdwjobs.com/search/jobs/in/country/united-states"
+  },
+  "Weston Solutions": {
+    "website": "https://www.westonsolutions.com/",
+    "careers": "https://www.westonsolutions.com/careers/",
+    "search": "https://www.westonsolutions.com/careers/career-opportunities/"
+  },
+  "Valero": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "United Launch Alliance": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "AM General": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Rolls-Royce": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Noble": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "PAE": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Deployed Resources": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "IBM": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "CGI": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "BP": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Teledyne": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Advent": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "HEICO": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "GEO Group": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "TTM Technologies": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Tetra Tech": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Porter Novelli": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Howmet": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "W S Darley": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Global Ordnance": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Mercury Systems": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "StandardAero": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "M1 Support Services": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "GSK": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Verizon": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Spirit AeroSystems": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Serco": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Deloitte": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Oracle Health": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Hensel Phelps Construction": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Kratos": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Emergent BioSolutions": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "CAES": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "NANA Regional Corporation": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "AAR": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Shell": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Cardinal Health": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Sanofi": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Unisys": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Crowley Maritime": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Securitas": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Lumen": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Brookhaven National Laboratory": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Great Lakes Dredge and Dock Company": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Insight Enterprises": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "World Wide Technology": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Woodward": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Carahsoft": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Hexcel": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "xAI": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Google": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Anthropic": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "OpenAI": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Crowdstrike": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Fortinet": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Palo Alto Networks": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Cloudflare": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Cisco": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "Amazon": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "GDIT": {
+    "website": "",
+    "careers": "",
+    "search": ""
+  },
+  "CSRA": {
+    "website": "",
+    "careers": "",
+    "search": ""
   }
 }
