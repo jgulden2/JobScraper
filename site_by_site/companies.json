@@ -310,308 +310,283 @@
     "search": "https://www.westonsolutions.com/careers/career-opportunities/"
   },
   "Valero": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.valero.com/",
+    "careers": "https://www.valero.com/careers",
+    "search": "https://valero.taleo.net/careersection/2/jobsearch.ftl?lang=en"
   },
   "United Launch Alliance": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.ulalaunch.com/",
+    "careers": "https://jobs.ulalaunch.com/?utm_source=careersite",
+    "search": "https://jobs.ulalaunch.com/search/"
   },
   "AM General": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.amgeneral.com/",
+    "careers": "https://www.amgeneral.com/careers/",
+    "search": "https://recruiting.ultipro.com/AMG1002AMGC/JobBoard/f40ecd9c-1926-422b-82bf-5d5df3c0ad54/"
   },
   "Rolls-Royce": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.rolls-roycemotorcars.com/en_US/home.html",
+    "careers": "https://careers.rolls-royce.com/usa",
+    "search": "https://rollsroyce.wd3.myworkdayjobs.com/professional"
   },
   "Noble": {
-    "website": "",
+    "website": "https://www.noble.com/",
     "careers": "",
-    "search": ""
+    "search": "https://apply.workable.com/wearenoble/#jobs"
   },
   "PAE": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.pae-engineers.com/",
+    "careers": "https://www.pae-engineers.com/careers",
+    "search": "https://www.paycomonline.net/v4/ats/web.php/portal/60E1645CD3118030493CCB4F790AF1C9/career-page"
   },
   "Deployed Resources": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.deployedresources.com/",
+    "careers": "https://www.deployedresources.com/careers/",
+    "search": "https://ukg4dr.rec.pro.ukg.net/DEP1003DEPL/JobBoard/0d2030c1-5f72-4e5e-a53a-2a7ed945fd18/?q=&o=postedDateDesc&w=&wc=&we=&wpst="
   },
   "IBM": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.ibm.com/us-en",
+    "careers": "https://www.ibm.com/careers",
+    "search": "https://www.ibm.com/careers/search"
   },
   "CGI": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.cgi.com/en",
+    "careers": "https://www.cgi.com/en/careers",
+    "search": "https://cgi.njoyn.com/corp/xweb/xweb.asp?CLID=21001&page=joblisting&lang=1"
   },
   "BP": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.bp.com/",
+    "careers": "https://careers.bp.com/",
+    "search": "https://careers.bp.com/listing"
   },
   "Teledyne": {
-    "website": "",
-    "careers": "",
-    "search": ""
-  },
-  "Advent": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.teledyne.com/en-us",
+    "careers": "https://www.teledyne.com/careers",
+    "search": "https://flir.wd1.myworkdayjobs.com/flircareers/jobs"
   },
   "HEICO": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://heico.com/",
+    "careers": "https://careers.heico.com/",
+    "search": "https://myjobs.adp.com/heico/cx"
   },
   "GEO Group": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.geogroup.com/",
+    "careers": "https://jobs.geogroup.com/working-at-geo/",
+    "search": "https://jobs.geogroup.com/working-at-geo/jobs"
   },
   "TTM Technologies": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.ttm.com/en",
+    "careers": "https://www.ttm.com/en/join-ttm",
+    "search": "https://ttmtech.wd5.myworkdayjobs.com/jobs"
   },
   "Tetra Tech": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.tetratech.com/",
+    "careers": "https://www.tetratech.com/careers/",
+    "search": "https://tetratech.referrals.selectminds.com/jobs/search/"
   },
   "Porter Novelli": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://porternovelli.com/",
+    "careers": "https://porternovelli.com/careers/",
+    "search": "https://job-boards.greenhouse.io/porternovelli"
   },
   "Howmet": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.howmet.com/",
+    "careers": "https://www.howmet.com/joinus/",
+    "search": "https://fa-exty-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs"
   },
-  "W S Darley": {
-    "website": "",
-    "careers": "",
-    "search": ""
-  },
-  "Global Ordnance": {
-    "website": "",
-    "careers": "",
-    "search": ""
+  "Darley": {
+    "website": "https://www.darley.com/",
+    "careers": "https://www.darley.com/careers/",
+    "search": "https://www.darley.com/careers/#open-positions"
   },
   "Mercury Systems": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.mrcy.com/",
+    "careers": "https://www.mrcy.com/careers",
+    "search": "https://myjobs.adp.com/mercurysystemscareers/cx"
   },
   "StandardAero": {
-    "website": "",
+    "website": "https://standardaero.com/aboutus/",
     "careers": "",
-    "search": ""
+    "search": "https://cva.fa.us1.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_3/jobs"
   },
   "M1 Support Services": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.m1services.com/",
+    "careers": "https://www.m1services.com/careers",
+    "search": "https://obi1.humanic.com/apex/12c_prd/f?p=M1SS_APSS:CAREERS"
   },
   "GSK": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.gsk.com/en-gb/",
+    "careers": "https://www.gsk.com/en-gb/careers/",
+    "search": "https://jobs.gsk.com/en-gb/jobs"
   },
   "Verizon": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.verizon.com/",
+    "careers": "https://mycareer.verizon.com/",
+    "search": "https://mycareer.verizon.com/jobs"
   },
   "Spirit AeroSystems": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.spiritaero.com/",
+    "careers": "https://careers.spiritaero.com/",
+    "search": "https://careers.spiritaero.com/jobs"
   },
   "Serco": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.serco.com/na",
+    "careers": "https://www.serco.com/na/careers",
+    "search": "https://careers-sercous.icims.com/jobs/search"
   },
   "Deloitte": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.deloitte.com/us/en.html",
+    "careers": "https://www.deloitte.com/us/en/careers/careers.html",
+    "search": "https://apply.deloitte.com/en_US/careers/SearchJobs"
   },
-  "Oracle Health": {
-    "website": "",
-    "careers": "",
-    "search": ""
+  "Oracle": {
+    "website": "https://www.oracle.com/",
+    "careers": "https://www.oracle.com/careers/",
+    "search": "https://careers.oracle.com/en/sites/jobsearch/jobs"
   },
   "Hensel Phelps Construction": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.henselphelps.com/",
+    "careers": "https://www.henselphelps.com/careers/",
+    "search": "https://recruiting2.ultipro.com/HEN1009HPCC/JobBoard/b27ab828-18a9-4f10-8ee1-8259de6c9e73/"
   },
   "Kratos": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.kratosdefense.com/",
+    "careers": "https://www.kratosdefense.com/careers",
+    "search": "https://www.kratosdefense.com/careers/open-roles"
   },
   "Emergent BioSolutions": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.emergentbiosolutions.com/",
+    "careers": "https://www.emergentbiosolutions.com/careers/",
+    "search": "https://careers.emergentbiosolutions.com/search/"
   },
   "CAES": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://caes.com/",
+    "careers": "https://careers.caes.com/careers-home/",
+    "search": "https://careers.caes.com/careers-home/jobs"
   },
   "NANA Regional Corporation": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.nana.com/",
+    "careers": "https://www.nana.com/careers/",
+    "search": "https://nana.dejobs.org/jobs/"
   },
   "AAR": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.aarcorp.com/",
+    "careers": "https://www.aarcorp.com/en/careers/",
+    "search": "https://aarcorp.taleo.net/careersection/2/jobsearch.ftl?lang=en"
   },
   "Shell": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.shell.us/",
+    "careers": "https://www.shell.com/careers.html",
+    "search": "https://shell.wd3.myworkdayjobs.com/ShellCareers"
   },
   "Cardinal Health": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.cardinalhealth.com/en.html",
+    "careers": "https://www.cardinalhealth.com/en/careers.html",
+    "search": "https://jobs.cardinalhealth.com/search/searchjobs"
   },
   "Sanofi": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.sanofi.com/en",
+    "careers": "https://jobs.sanofi.com/en",
+    "search": "https://jobs.sanofi.com/en/search-jobs"
   },
   "Unisys": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.unisys.com/",
+    "careers": "https://www.unisys.com/careers/",
+    "search": "https://unisys.wd5.myworkdayjobs.com/en-US/External/"
   },
   "Crowley Maritime": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.crowley.com/",
+    "careers": "https://www.crowley.com/careers/",
+    "search": "https://crowley.taleo.net/careersection/cmc_external/jobsearch.ftl"
   },
   "Securitas": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.securitasinc.com/",
+    "careers": "https://www.securitasinc.com/career/",
+    "search": "https://ekaw.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX/jobs"
   },
   "Lumen": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.lumen.com/en-us/home.html",
+    "careers": "https://jobs.lumen.com/global/en/",
+    "search": "https://careers.lumen.com/careers?start=0&pid=1133910086381&sort_by=hot"
   },
   "Brookhaven National Laboratory": {
-    "website": "",
-    "careers": "",
-    "search": ""
-  },
-  "Great Lakes Dredge and Dock Company": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.bnl.gov/world/",
+    "careers": "https://www.bnl.gov/careers/",
+    "search": "https://bnl.wd1.myworkdayjobs.com/en-US/Externa"
   },
   "Insight Enterprises": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.insight.com/en_US/home.html",
+    "careers": "https://www.insight.com/en_US/careers.html",
+    "search": "https://careers.insight.com/careers"
   },
   "World Wide Technology": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.wwt.com/",
+    "careers": "https://www.wwt.com/corporate/who-we-are/careers",
+    "search": "https://myjobs.adp.com/wwtexternalcareersite/cx/job-listing"
   },
   "Woodward": {
-    "website": "",
-    "careers": "",
-    "search": ""
-  },
-  "Carahsoft": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.woodward.com/",
+    "careers": "https://www.woodward.com/careers/",
+    "search": "https://woodward.wd5.myworkdayjobs.com/woodward"
   },
   "Hexcel": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.hexcel.com/",
+    "careers": "https://www.hexcel.com/Careers/",
+    "search": "https://hexcel.wd5.myworkdayjobs.com/HexcelCareers/jobs"
   },
   "xAI": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://x.ai/",
+    "careers": "https://x.ai/careers",
+    "search": "https://x.ai/careers/open-roles"
   },
   "Google": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://about.google/",
+    "careers": "https://www.google.com/about/careers/applications/",
+    "search": "https://www.google.com/about/careers/applications/jobs/results"
   },
   "Anthropic": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.anthropic.com/",
+    "careers": "https://www.anthropic.com/careers",
+    "search": "https://www.anthropic.com/jobs"
   },
   "OpenAI": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://openai.com/",
+    "careers": "https://openai.com/careers/",
+    "search": "https://openai.com/careers/search/"
   },
   "Crowdstrike": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.crowdstrike.com/en-us/",
+    "careers": "https://www.crowdstrike.com/en-us/careers/",
+    "search": "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers"
   },
   "Fortinet": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.fortinet.com/",
+    "careers": "https://www.fortinet.com/corporate/careers",
+    "search": "https://edel.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_2001/jobs"
   },
   "Palo Alto Networks": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.paloaltonetworks.com/",
+    "careers": "https://jobs.paloaltonetworks.com/en",
+    "search": "https://jobs.paloaltonetworks.com/en/search-jobs"
   },
   "Cloudflare": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.cloudflare.com/",
+    "careers": "https://www.cloudflare.com/careers/",
+    "search": "https://www.cloudflare.com/careers/jobs/"
   },
   "Cisco": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.cisco.com",
+    "careers": "https://careers.cisco.com/global/en",
+    "search": "https://careers.cisco.com/global/en/search-results"
   },
   "Amazon": {
     "website": "",
-    "careers": "",
-    "search": ""
+    "careers": "https://www.amazon.jobs/en/",
+    "search": "https://www.amazon.jobs/en/search"
   },
   "GDIT": {
-    "website": "",
-    "careers": "",
-    "search": ""
-  },
-  "CSRA": {
-    "website": "",
-    "careers": "",
-    "search": ""
+    "website": "https://www.gdit.com/",
+    "careers": "https://www.gdit.com/careers/",
+    "search": "https://www.gdit.com/careers/search/"
   }
 }
