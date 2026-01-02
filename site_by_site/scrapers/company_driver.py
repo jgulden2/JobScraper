@@ -67,12 +67,47 @@ class CompanyConfigScraper(JobScraper):
         self.VENDOR = cfg.name
         self.vendor = cfg.name
 
-        platform_key = cfg.platform_name or "sitemap_job_urls"
-        if platform_key not in ADAPTERS:
-            raise ValueError(
-                f"Unknown platform {platform_key!r} for company {cfg.company_id!r}"
+        # Pick adapter:
+        # 1) explicit cfg.platform_name wins
+        # 2) otherwise, probe all adapters and pick best match
+        platform_key = (cfg.platform_name or "").strip()
+
+        if platform_key:
+            if platform_key not in ADAPTERS:
+                raise ValueError(
+                    f"Unknown platform {platform_key!r} for company {cfg.company_id!r}"
+                )
+            self.adapter: Adapter = ADAPTERS[platform_key]
+        else:
+            # probe-based selection (Phase 1.1)
+            scored = []
+            for key, ad in ADAPTERS.items():
+                try:
+                    score = float(ad.probe(cfg))
+                except Exception:
+                    score = 0.0
+                scored.append((score, key, ad))
+
+            scored.sort(reverse=True, key=lambda t: t[0])
+            best_score, best_key, best_ad = (
+                scored[0]
+                if scored
+                else (0.0, "sitemap_job_urls", ADAPTERS["sitemap_job_urls"])
             )
-        self.adapter: Adapter = ADAPTERS[platform_key]
+
+            # If nothing matches, fall back to sitemap adapter (safe default)
+            if best_score <= 0.0:
+                best_key = "sitemap_job_urls"
+                best_ad = ADAPTERS[best_key]
+
+            self.log(
+                "adapter:select",
+                company_id=cfg.company_id,
+                chosen=best_key,
+                score=best_score,
+                top3=",".join([f"{k}:{s:.2f}" for s, k, _ in scored[:3]]),
+            )
+            self.adapter = best_ad
 
     def fetch_data(self) -> List[Dict[str, Any]]:
         rows = self.adapter.list_jobs(self, self.cfg)
@@ -237,15 +272,6 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
                 )
                 return driver.page_source or ""
 
-        # DEBUG: dump the first listing page HTML for selector tuning
-        try:
-            if "search/jobs" in url and "page=1" in url:
-                with open("leidos_page1.html", "w", encoding="utf-8") as f:
-                    f.write(driver.page_source or "")
-                self.log("browser:dumped_html", file="leidos_page1.html", url=url)
-        except Exception as e:
-            self.log("browser:dump_html:error", url=url, error=str(e))
-
         return driver.page_source or ""
 
     def run(self) -> None:  # type: ignore[override]
@@ -311,12 +337,20 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
                 for fut in as_completed(futures):
                     parsed.extend(fut.result())
 
-            self.jobs = parsed
+            # Treat browser-derived parsed rows as the "full" view too
+            # (Phase 1.1 consistency: always emit *_jobs.full.csv when possible)
+            self.jobs_full = list(parsed)
+
+            # Keep canonical/min view aligned (for now, same payload)
+            self.jobs = list(parsed)
+
             self.log("done", count=len(self.jobs))
+            self.log("parse:errors", n=0)
             self.log("run:duration", seconds=round(time() - start, 3))
 
+            parsed = self.dedupe_records(parsed)
+
         finally:
-            # ✅ THIS is what closes the listing browser + any drivers created
             self.close()
 
     def parse_job(self, raw_job: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # type: ignore[override]

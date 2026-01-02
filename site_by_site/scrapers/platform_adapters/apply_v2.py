@@ -17,6 +17,22 @@ class ApplyV2Adapter(Adapter):
     Detail is handled by CompanyConfigScraper via fetch_detail_artifacts().
     """
 
+    @classmethod
+    def probe(cls, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "apply_v2":
+            return 1.0
+
+        api = ""
+        pag = getattr(cfg, "pagination", None) or {}
+        if isinstance(pag, dict):
+            api = pag.get("api_url") or ""
+        if "/api/apply/v2/jobs" in (api or "") or "/api/apply/v2/jobs" in (
+            getattr(cfg, "search_url", "") or ""
+        ):
+            return 0.9
+        return 0.0
+
     @staticmethod
     def _default_api_url(careers_home: str) -> str:
         # e.g. https://jobs.northropgrumman.com -> https://jobs.northropgrumman.com/api/apply/v2/jobs

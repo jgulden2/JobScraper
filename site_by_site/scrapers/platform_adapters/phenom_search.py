@@ -24,6 +24,17 @@ class PhenomSearchAdapter:
       - normalize() reads artifacts["_vendor_blob"] (Phenom job detail payload)
     """
 
+    def probe(self, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "phenom_search":
+            return 1.0
+
+        su = getattr(cfg, "search_url", "") or ""
+        # Common phenom search pattern
+        if "search-results" in su and "/en/" in su:
+            return 0.8
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         pag = cfg.pagination or {}
 

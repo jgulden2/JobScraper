@@ -24,6 +24,18 @@ class SeleniumPagedHtmlSearchAdapter:
       - Safety: if we add 0 jobs on a page (or for several pages), we stop early
     """
 
+    def probe(self, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "selenium_paged_html_search":
+            return 1.0
+
+        if bool(getattr(cfg, "requires_browser_bootstrap", False)):
+            # If it explicitly needs browser bootstrap and looks like paged HTML
+            su = getattr(cfg, "search_url", "") or ""
+            if "{page}" in su:
+                return 0.75
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         pag = cfg.pagination or {}
         base_url = (cfg.search_url or cfg.careers_home or "").strip()

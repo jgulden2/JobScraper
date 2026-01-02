@@ -39,6 +39,24 @@ class PagedHtmlSearchAdapter:
       }
     """
 
+    def probe(self, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "paged_html_search":
+            return 1.0
+
+        dtype = (getattr(cfg, "discovery_type", "") or "").lower()
+        if dtype == "html_search":
+            return 0.6
+
+        su = (
+            (getattr(cfg, "search_url", "") or "")
+            + " "
+            + (getattr(cfg, "careers_home", "") or "")
+        )
+        if "search-jobs" in su or "/search/" in su:
+            return 0.35
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         pag = cfg.pagination or {}
         base_url = (cfg.search_url or cfg.careers_home or "").strip()

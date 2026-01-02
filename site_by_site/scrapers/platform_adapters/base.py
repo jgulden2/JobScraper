@@ -7,24 +7,21 @@ from typing import Any, Dict, List, Optional, Protocol
 
 @dataclass(frozen=True)
 class JobRef:
-    """
-    Listing-only job reference returned by adapters.
-    Adapters should NOT fetch detail HTML. They return stable IDs + URLs (+ optional metadata).
-    """
-
     detail_url: str
     posting_id: Optional[str] = None
     title: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = None  # adapter-specific passthrough
+    raw: Optional[Dict[str, Any]] = None
 
 
 class Adapter(Protocol):
     """
-    Phase 0.3 contract:
-      - list_jobs() = listing discovery only
-      - normalize() = map (raw_job + artifacts) -> raw record dict
-      - No detail fetching inside adapters (driver owns fetch_detail_artifacts)
+    Phase 1.1 contract:
+      - probe(): returns confidence 0. plotting into [0.0, 1.0]
+      - list_jobs(): listing discovery only
+      - normalize(): map (raw_job + artifacts) -> raw record dict
     """
+
+    def probe(self, cfg: Any) -> float: ...
 
     def list_jobs(self, scraper: Any, cfg: Any) -> List[Dict[str, Any]]: ...
 

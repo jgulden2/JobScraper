@@ -21,6 +21,15 @@ class USAJobsApiAdapter:
 
     skip_detail_fetch = True
 
+    def probe(self, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "usajobs_api":
+            return 1.0
+        su = getattr(cfg, "search_url", "") or ""
+        if "data.usajobs.gov/api/Search" in su:
+            return 0.95
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         pag = cfg.pagination or {}
 

@@ -16,6 +16,23 @@ class SitemapJobUrlsAdapter:
       - Normalize: prefer JSON-LD (JobPosting) + fall back to raw listing fields
     """
 
+    def probe(self, cfg) -> float:
+        # High confidence if config explicitly uses sitemap discovery or provides sitemap URLs
+        dtype = (
+            getattr(cfg, "discovery_type", None)
+            or getattr(cfg, "discovery", {}).get("type")
+            if isinstance(getattr(cfg, "discovery", None), dict)
+            else None
+        )
+        has_sm = bool(
+            getattr(cfg, "sitemap_url", None) or getattr(cfg, "sitemap_index_url", None)
+        )
+        if dtype in ("sitemap", "sitemap_index"):
+            return 1.0
+        if has_sm:
+            return 0.8
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         c = self._cfg(cfg)
         company_id = c["company_id"] or "unknown"

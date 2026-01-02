@@ -12,6 +12,21 @@ class PhenomSitemapAdapter(SitemapJobUrlsAdapter):
     Normalize: prefer Phenom vendor blob (phApp.ddo extracted into artifacts["_vendor_blob"]).
     """
 
+    def probe(self, cfg) -> float:
+        # If platform name is phenom, or sitemap urls include /global/en/ (common phenom tenant)
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "phenom":
+            return 1.0
+
+        sm = (
+            (getattr(cfg, "sitemap_url", "") or "")
+            + " "
+            + (getattr(cfg, "sitemap_index_url", "") or "")
+        )
+        if "/global/en/" in sm:
+            return 0.85
+        return 0.0
+
     def normalize(
         self, cfg: Any, raw_job: Dict[str, Any], artifacts: Dict[str, Any]
     ) -> Dict[str, Any]:

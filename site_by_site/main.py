@@ -391,6 +391,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+# Phase 1 guardrail:
+# New sources MUST be added via companies config + adapters.
+# Do NOT add new company-specific scraper classes/files.
+PHASE_1_NO_NEW_COMPANY_SCRAPERS = True
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     Program entrypoint: configure logging, parse args, and run selected scrapers.
@@ -403,6 +409,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
+
+    if PHASE_1_NO_NEW_COMPANY_SCRAPERS and not args.companies_config:
+        logging.getLogger(__name__).warning(
+            "phase1:legacy_scrapers_used",
+            extra={
+                "scraper": "",
+                "hint": "Prefer --companies-config (config+adapters). Do not add new company scraper files.",
+            },
+        )
 
     # ---------- Resolve output dir and optional --since ----------
     out_dir = Path(args.output_dir)

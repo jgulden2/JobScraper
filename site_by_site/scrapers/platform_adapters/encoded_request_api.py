@@ -69,6 +69,17 @@ class EncodedRequestApiAdapter:
             "usedPlacesApi": False,
         }
 
+    def probe(self, cfg) -> float:
+        pn = (getattr(cfg, "platform_name", "") or "").lower()
+        if pn == "encoded_request_api":
+            return 1.0
+
+        pag = getattr(cfg, "pagination", None) or {}
+        api = pag.get("api_url") if isinstance(pag, dict) else ""
+        if isinstance(api, str) and "API/Careers/CareerSearch" in api:
+            return 0.9
+        return 0.0
+
     def list_jobs(self, scraper, cfg) -> List[Dict[str, Any]]:
         self._warm_session(scraper, cfg)
 

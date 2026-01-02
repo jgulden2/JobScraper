@@ -1,4 +1,3 @@
-site_by_site/run.log
 site_by_site/scrapers/__pycache__
 site_by_site/utils/__pycache__
 site_by_site/scraped_data
@@ -10,6 +9,7 @@ site_by_site/.pytest_cache
 site_by_site/logs
 site_by_site/api/create_admin.py
 site_by_site/scrapers/platform_adapters/__pycache__
+site_by_site/*.log
 .env
 companies_old.json
 results.json
