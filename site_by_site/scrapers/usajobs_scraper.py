@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import os
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 
 
 class USAJOBSScraper(JobScraper):

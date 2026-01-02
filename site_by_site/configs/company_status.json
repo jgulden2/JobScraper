@@ -1,0 +1,29 @@
+{
+  "version": "0.2",
+  "status": {
+    "rtx": {
+      "last_success": "2026-01-02T19:35:18+00:00",
+      "last_failure": "2026-01-02T20:31:45+00:00",
+      "last_failure_type": "TypeError",
+      "failure_count": 1
+    },
+    "thales": {
+      "last_success": "2026-01-02T19:35:20+00:00",
+      "last_failure": null,
+      "last_failure_type": null,
+      "failure_count": 0
+    },
+    "l3harris": {
+      "last_success": "2026-01-02T19:35:22+00:00",
+      "last_failure": null,
+      "last_failure_type": null,
+      "failure_count": 0
+    },
+    "boozallen": {
+      "last_success": "2026-01-02T19:35:27+00:00",
+      "last_failure": null,
+      "last_failure_type": null,
+      "failure_count": 0
+    }
+  }
+}

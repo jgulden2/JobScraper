@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Set
 
 from bs4 import BeautifulSoup as BS
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts
 

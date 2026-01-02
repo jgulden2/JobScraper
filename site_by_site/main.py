@@ -21,6 +21,8 @@ from pathlib import Path
 from time import time
 from utils.geocode import geocode_unique
 from utils.transforms import parse_date
+from scrapers.company_driver import CompanyConfigScraper
+from utils.company_config import load_companies_0_2, update_company_status
 from datetime import datetime, date, timezone
 from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
@@ -371,6 +373,18 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=None,
         help="Write Prometheus text format here",
     )
+    parser.add_argument(
+        "--companies-config",
+        default=None,
+        help="Path to companies JSON config (enables config-driven company runs).",
+    )
+    parser.add_argument(
+        "--companies",
+        nargs="*",
+        default=None,
+        help="Company IDs to run from --companies-config (e.g., rtx thales). If omitted, runs all in config.",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -429,6 +443,163 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Global cap (overall ceiling). Independent of per-scraper cap.
     # Argparse already typed this as int|None.
     global_cap = args.limit_global
+
+    # Helper: apply same --since filtering as run_scraper() for config-driven runs
+    def apply_since_filter(obj, scraper_name: str) -> None:
+        if since_dt is None:
+            return
+
+        def _as_dt(iso_str: Optional[str]) -> Optional[date]:
+            if not iso_str:
+                return None
+            norm = parse_date(str(iso_str))
+            if not norm:
+                return None
+            try:
+                return datetime.strptime(norm, "%Y-%m-%d").date()
+            except Exception:
+                return None
+
+        # Filter canonical/min view
+        before_min = len(getattr(obj, "jobs", []) or [])
+        jobs_min = [
+            r
+            for r in (getattr(obj, "jobs", []) or [])
+            if _as_dt(r.get("Post Date")) and _as_dt(r.get("Post Date")) >= since_dt
+        ]
+        setattr(obj, "jobs", jobs_min)
+        logging.getLogger(__name__).info(
+            "since:filter:min",
+            extra={
+                "scraper": scraper_name,
+                "kept": len(jobs_min),
+                "prev": before_min,
+                "since": str(since_dt),
+            },
+        )
+
+        # Filter full view if present
+        jf = getattr(obj, "jobs_full", None)
+        if isinstance(jf, list) and jf:
+            before_full = len(jf)
+            jobs_full = [
+                r
+                for r in jf
+                if _as_dt(r.get("Post Date")) and _as_dt(r.get("Post Date")) >= since_dt
+            ]
+            setattr(obj, "jobs_full", jobs_full)
+            logging.getLogger(__name__).info(
+                "since:filter:full",
+                extra={
+                    "scraper": scraper_name,
+                    "kept": len(jobs_full),
+                    "prev": before_full,
+                    "since": str(since_dt),
+                },
+            )
+
+    # -----------------------------
+    # Config-driven company runs (Phase 0.2)
+    # -----------------------------
+    if args.companies_config:
+        companies = load_companies_0_2(
+            args.companies_config
+        )  # 0.2 schema validation + status merge
+        selected = list(args.companies or companies.keys())
+
+        built = []
+        for cid in selected:
+            if cid not in companies:
+                logging.getLogger(__name__).warning(
+                    "company:unknown",
+                    extra={
+                        "scraper": "",
+                        "company_id": cid,
+                        "known": sorted(companies.keys())[:50],
+                    },
+                )
+                continue
+
+            cfg = companies[cid]
+            s = CompanyConfigScraper(cfg)
+
+            # Keep behavior aligned with run_scraper()
+            s.testing = bool(testing_like)
+            if per_scraper_cap is not None:
+                try:
+                    s.test_limit = int(per_scraper_cap)
+                except Exception:
+                    pass
+
+            # Attach DB options (same as run_scraper)
+            try:
+                setattr(s, "db_url", args.db_url)
+                setattr(s, "db_table", args.db_table)
+                setattr(s, "db_mode", args.db_mode)
+                setattr(s, "db_skip_existing", not bool(args.no_db_skip_existing))
+            except Exception:
+                pass
+
+            # Workers
+            if args.workers:
+                try:
+                    setattr(s, "max_workers", max(1, int(args.workers)))
+                except Exception:
+                    pass
+
+            out = out_dir / f"{cid}_jobs.csv"
+
+            # 0.2: operational controls
+            if getattr(cfg, "disabled", False):
+                logging.getLogger(__name__).info(
+                    "company:disabled:skip",
+                    extra={"scraper": "", "company_id": cid},
+                )
+                continue
+
+            # Optional: honor cooldown_minutes after failures (simple policy)
+            cooldown_min = float(getattr(cfg, "cooldown_minutes", 0) or 0)
+            st = getattr(cfg, "status", {}) or {}
+            last_fail = st.get("last_failure")
+            if cooldown_min and last_fail:
+                try:
+                    lf = datetime.fromisoformat(str(last_fail).replace("Z", "+00:00"))
+                    age_s = (
+                        datetime.now(timezone.utc) - lf.astimezone(timezone.utc)
+                    ).total_seconds()
+                    if age_s < cooldown_min * 60:
+                        logging.getLogger(__name__).info(
+                            "company:cooldown:skip",
+                            extra={
+                                "scraper": "",
+                                "company_id": cid,
+                                "cooldown_minutes": cooldown_min,
+                                "seconds_since_failure": round(age_s, 1),
+                            },
+                        )
+                        continue
+                except Exception:
+                    # If timestamp is malformed, ignore cooldown rather than breaking runs
+                    pass
+
+            try:
+                s.run()
+                apply_since_filter(s, scraper_name=cid)
+                s.export(str(out))
+                update_company_status(cfg.company_id, ok=True)
+
+            except Exception as e:
+                update_company_status(
+                    cfg.company_id,
+                    ok=False,
+                    failure_type=type(e).__name__,
+                )
+                raise
+
+            built.append(s)
+
+        # Exit after config-driven run
+        return 0
 
     # Run selected scrapers (or all if none specified) and keep handles.
     to_run = list(args.scrapers or SCRAPER_MAPPING.keys())
@@ -496,13 +667,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             since_date=since_dt,
             workers=args.workers,
         )
-        if s:
-            built.append(s)
-
-        s.testing = bool(testing_like)
-        if eff_cap is not None:
-            s.test_limit = int(eff_cap)
         if s is not None:
+            built.append(s)
             ran.append(s)
 
         # Consume from the global budget (if present)

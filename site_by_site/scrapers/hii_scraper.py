@@ -15,7 +15,7 @@ import re
 import requests
 from bs4 import BeautifulSoup as BS
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 
 
 class HIIScraper(JobScraper):

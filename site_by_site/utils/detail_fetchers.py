@@ -8,7 +8,6 @@ from typing import Callable, Any, Optional, Dict
 from bs4 import BeautifulSoup as BS
 from utils.extractors import (
     extract_phapp_ddo,
-    extract_smartapply,
     extract_jsonld,
     extract_meta,
     extract_datalayer,
@@ -109,13 +108,17 @@ def fetch_detail_artifacts(
     }
 
     # --- 2) Try to extract vendor-native blobs (preferred -> fallback) ---
-    # 2a) phApp.ddo (BAE/RTX/etc.)
+    # 2a) phApp.ddo (Phenom)
     if get_vendor_blob:
+        ph = None
         try:
             ph = extract_phapp_ddo(html_text)
+        except ValueError:
+            # Expected on non-Phenom pages; don't pollute logs with "error"
+            log("detail:extract:phapp:miss", level="debug", url=detail_url)
         except Exception as e:
+            # Unexpected parse issues
             log("detail:extract:phapp:error", url=detail_url, error=str(e))
-            ph = None
 
         if isinstance(ph, dict) and ph:
             # Common paths:
@@ -131,18 +134,6 @@ def fetch_detail_artifacts(
             if isinstance(job, dict) and job:
                 bundle["_vendor_blob"] = job
                 log("detail:extract:phapp:ok", url=detail_url)
-
-        # 2b) smartApplyData (Northrop fallback) — only if vendor_blob still empty
-        if bundle["_vendor_blob"] is None:
-            try:
-                smart = extract_smartapply(html_text)
-            except Exception as e:
-                log("detail:extract:smartapply:error", url=detail_url, error=str(e))
-                smart = None
-
-            if isinstance(smart, dict) and smart:
-                bundle["_vendor_blob"] = smart
-                log("detail:extract:smartapply:ok", url=detail_url)
 
     # --- 3) Optional secondary artifacts (schema/meta/analytics/canonical) ---
     if get_jsonld:

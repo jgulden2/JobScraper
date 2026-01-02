@@ -13,7 +13,7 @@ from __future__ import annotations
 import requests
 
 from typing import Any, Dict, List, Optional
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from utils.detail_fetchers import fetch_detail_artifacts
 

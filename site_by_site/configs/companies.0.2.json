@@ -1,0 +1,97 @@
+{
+    "version": "0.2",
+    "companies": {
+        "rtx": {
+            "identity": {
+                "company_id": "rtx",
+                "name": "RTX",
+                "domain": "careers.rtx.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.rtx.com",
+                "search_url": "https://careers.rtx.com/global/en/search-results",
+                "sitemap_index_url": "https://careers.rtx.com/global/en/sitemap_index.xml"
+            },
+            "platform": {
+                "name": "phenom"
+            },
+            "access_policy": {
+                "requires_browser_bootstrap": false,
+                "max_rps": 2.0,
+                "cooldown_minutes": 0,
+                "headers": {
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "sitemap_index",
+                "job_url_contains": "/global/en/job/"
+            }
+        },
+        "thales": {
+            "identity": {
+                "company_id": "thales",
+                "name": "Thales",
+                "domain": "careers.thalesgroup.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.thalesgroup.com",
+                "sitemap_index_url": "https://careers.thalesgroup.com/global/en/sitemap_index.xml"
+            },
+            "platform": {
+                "name": "phenom"
+            },
+            "access_policy": {
+                "max_rps": 2.0,
+                "headers": {
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "sitemap_index",
+                "job_url_contains": "/global/en/job/"
+            }
+        },
+        "l3harris": {
+            "identity": {
+                "company_id": "l3harris",
+                "name": "L3Harris",
+                "domain": "careers.l3harris.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.l3harris.com",
+                "search_url": "https://careers.l3harris.com/en/search-jobs",
+                "sitemap_url": "https://careers.l3harris.com/en/sitemap.xml"
+            },
+            "access_policy": {
+                "max_rps": 2.0
+            },
+            "discovery_hints": {
+                "type": "sitemap",
+                "job_url_contains": "/job/"
+            }
+        },
+        "boozallen": {
+            "identity": {
+                "company_id": "boozallen",
+                "name": "Booz Allen Hamilton",
+                "domain": "careers.boozallen.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.boozallen.com",
+                "search_url": "https://careers.boozallen.com/careers/SearchJobs",
+                "sitemap_url": "https://careers.boozallen.com/jobs/sitemap.xml"
+            },
+            "access_policy": {
+                "max_rps": 1.0
+            },
+            "discovery_hints": {
+                "type": "sitemap",
+                "allowed_prefixes": [
+                    "https://careers.boozallen.com/careers/JobDetail/",
+                    "https://careers.boozallen.com/jobs/JobDetail/"
+                ]
+            }
+        }
+    }
+}

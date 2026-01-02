@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobscraper.local/schemas/company.schema.json",
+  "title": "JobScraper Company Config",
+  "type": "object",
+  "required": ["version", "companies"],
+  "properties": {
+    "version": { "type": "string", "enum": ["0.2"] },
+    "companies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/company" }
+    }
+  },
+  "$defs": {
+    "company": {
+      "type": "object",
+      "required": ["identity", "entry_points"],
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "$ref": "#/$defs/identity" },
+        "entry_points": { "$ref": "#/$defs/entry_points" },
+        "platform": { "$ref": "#/$defs/platform" },
+        "access_policy": { "$ref": "#/$defs/access_policy" },
+        "discovery_hints": { "$ref": "#/$defs/discovery_hints" },
+        "status": { "$ref": "#/$defs/status" },
+        "disabled": { "type": "boolean", "default": false },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": ["company_id", "name", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{1,64}$"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "domain": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
+        }
+      }
+    },
+    "entry_points": {
+      "type": "object",
+      "required": ["careers_home"],
+      "additionalProperties": false,
+      "properties": {
+        "careers_home": { "type": "string", "format": "uri" },
+        "search_url": { "type": "string", "format": "uri" },
+        "sitemap_url": { "type": "string", "format": "uri" },
+        "sitemap_index_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "tenant": { "type": "string" },
+        "slug": { "type": "string" }
+      }
+    },
+    "access_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires_browser_bootstrap": { "type": "boolean", "default": false },
+        "max_rps": { "type": "number", "minimum": 0.1, "default": 2.0 },
+        "cooldown_minutes": { "type": "number", "minimum": 0, "default": 0 },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        }
+      }
+    },
+    "discovery_hints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["sitemap", "sitemap_index", "api", "html_search"] },
+        "job_url_contains": { "type": "string" },
+        "allowed_prefixes": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "locale": { "type": "string" },
+        "pagination": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "last_success": { "type": ["string", "null"], "format": "date-time" },
+        "last_failure": { "type": ["string", "null"], "format": "date-time" },
+        "last_failure_type": { "type": ["string", "null"] },
+        "failure_count": { "type": "integer", "minimum": 0, "default": 0 }
+      }
+    }
+  }
+}

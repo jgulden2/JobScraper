@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.detail_fetchers import fetch_detail_artifacts
 from utils.sitemap import parse_sitemap_xml
 

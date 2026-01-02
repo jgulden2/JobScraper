@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, Dict, List
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.detail_fetchers import fetch_detail_artifacts
 from utils.sitemap import parse_sitemap_xml
 

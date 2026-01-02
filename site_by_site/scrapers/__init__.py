@@ -14,7 +14,7 @@ import importlib
 import pkgutil
 from typing import Dict, Type
 
-from .base import JobScraper
+from .engine import JobScraper
 
 # Discover and import all modules in this package so subclasses register.
 for loader, name, is_pkg in pkgutil.walk_packages(__path__):

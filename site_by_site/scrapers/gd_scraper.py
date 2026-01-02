@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from bs4 import BeautifulSoup as BS
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.http import b64url_encode
 from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts

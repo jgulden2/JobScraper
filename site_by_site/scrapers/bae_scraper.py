@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.extractors import extract_phapp_ddo, extract_total_results
 from utils.detail_fetchers import fetch_detail_artifacts
 

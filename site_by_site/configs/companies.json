@@ -1,0 +1,89 @@
+{
+    "rtx": {
+        "company_id": "rtx",
+        "name": "RTX",
+        "vendor": "RTX",
+        "platform": "sitemap_job_urls",
+        "entrypoints": {
+            "careers_home": "https://careers.rtx.com",
+            "search_url": "https://careers.rtx.com/global/en/search-results",
+            "sitemap_index_url": "https://careers.rtx.com/global/en/sitemap_index.xml"
+        },
+        "discovery": {
+            "type": "sitemap_index",
+            "job_url_contains": "/job/"
+        },
+        "access": {
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+        }
+    },
+    "thales": {
+        "company_id": "thales",
+        "name": "Thales",
+        "vendor": "Thales",
+        "platform": "sitemap_job_urls",
+        "entrypoints": {
+            "careers_home": "https://careers.thalesgroup.com",
+            "search_url": "https://careers.thalesgroup.com/global/en",
+            "sitemap_index_url": "https://careers.thalesgroup.com/global/en/sitemap_index.xml"
+        },
+        "discovery": {
+            "type": "sitemap_index",
+            "job_url_contains": "/global/en/job/"
+        },
+        "access": {
+            "headers": {
+                "User-Agent": "Mozilla/5.0",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+        }
+    },
+    "l3harris": {
+        "company_id": "l3harris",
+        "name": "L3Harris",
+        "vendor": "L3Harris",
+        "platform": "sitemap_job_urls",
+        "entrypoints": {
+            "careers_home": "https://careers.l3harris.com",
+            "search_url": "https://careers.l3harris.com/en/search-jobs",
+            "sitemap_url": "https://careers.l3harris.com/en/sitemap.xml"
+        },
+        "discovery": {
+            "type": "sitemap",
+            "job_url_contains": "/job/"
+        },
+        "access": {
+            "headers": {
+                "User-Agent": "Mozilla/5.0",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+        }
+    },
+    "boozallen": {
+        "company_id": "boozallen",
+        "name": "Booz Allen Hamilton",
+        "vendor": "Booz Allen Hamilton",
+        "platform": "sitemap_job_urls",
+        "entrypoints": {
+            "careers_home": "https://careers.boozallen.com",
+            "search_url": "https://careers.boozallen.com/careers/SearchJobs",
+            "sitemap_url": "https://careers.boozallen.com/jobs/sitemap.xml"
+        },
+        "discovery": {
+            "type": "sitemap",
+            "allowed_prefixes": [
+                "https://careers.boozallen.com/careers/JobDetail/",
+                "https://careers.boozallen.com/jobs/JobDetail/"
+            ]
+        },
+        "access": {
+            "headers": {
+                "User-Agent": "Mozilla/5.0",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+        }
+    }
+}

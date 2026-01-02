@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup as BS
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.extractors import extract_bold_block
 from utils.detail_fetchers import fetch_detail_artifacts
 from utils.sitemap import parse_sitemap_xml

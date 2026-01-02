@@ -29,7 +29,7 @@ import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 
-from scrapers.base import JobScraper
+from scrapers.engine import JobScraper
 from utils.canonicalize import CANON_COLUMNS, canonicalize_record
 
 
