@@ -150,27 +150,3 @@ def fetch_detail_artifacts(
         get_meta=get_meta,
         get_datalayer=get_datalayer,
     )
-
-
-def fetch_detail_artifacts_from_html(
-    html_text: str,
-    log: Logger,
-    detail_url: str,
-    *,
-    get_vendor_blob: bool = True,
-    get_jsonld: bool = True,
-    get_meta: bool = True,
-    get_datalayer: bool = True,
-) -> Dict[str, Any]:
-    """
-    Parse artifacts from HTML already obtained out-of-band (e.g. Selenium).
-    """
-    return _parse_detail_artifacts_from_html(
-        html_text,
-        log,
-        detail_url,
-        get_vendor_blob=get_vendor_blob,
-        get_jsonld=get_jsonld,
-        get_meta=get_meta,
-        get_datalayer=get_datalayer,
-    )

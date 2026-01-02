@@ -9,12 +9,17 @@ Legacy company-specific scrapers may exist until Phase 1 migration.
 # scrapers/company_driver.py
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import tempfile
+import os
 
+import undetected_chromedriver as uc
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from time import time
+from typing import Any, Dict, List, Optional
 from scrapers.engine import JobScraper
 from utils.detail_fetchers import fetch_detail_artifacts
 from utils.company_config import CompanyConfig
-from utils.detail_fetchers import fetch_detail_artifacts_from_html
 from scrapers.platform_adapters.base import Adapter
 from scrapers.platform_adapters.sitemap_job_urls import SitemapJobUrlsAdapter
 from scrapers.platform_adapters.phenom_sitemap import PhenomSitemapAdapter
@@ -26,6 +31,8 @@ from scrapers.platform_adapters.selenium_paged_html_search import (
 from scrapers.platform_adapters.usajobs_api import USAJobsApiAdapter
 from scrapers.platform_adapters.phenom_search import PhenomSearchAdapter
 from scrapers.platform_adapters.encoded_request_api import EncodedRequestApiAdapter
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 
 # -----------------------------
@@ -118,19 +125,34 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
         self._drivers_lock = threading.Lock()
 
     def _new_driver(self):
-        import undetected_chromedriver as uc
-
         options = uc.ChromeOptions()
-        options.add_argument("--headless=new")
+
+        # NON-HEADLESS (so you see the window)
+        # Do NOT add any --headless flags.
+
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1400,900")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--remote-allow-origins=*")
 
-        driver = uc.Chrome(options=options)
+        # Fresh profile to avoid “stuck session / weird redirects”
+        profile_dir = tempfile.mkdtemp(prefix="job_scraper_uc_")
+        options.add_argument(f"--user-data-dir={profile_dir}")
+
+        # Optional: sometimes helps keep it visible / stable
+        options.add_argument("--start-maximized")
+
+        driver = uc.Chrome(options=options, use_subprocess=True)
+
+        driver.minimize_window()
+        driver.set_page_load_timeout(60)
+        driver.set_script_timeout(60)
 
         with self._drivers_lock:
             self._drivers.append(driver)
+
         return driver
 
     def _driver(self):
@@ -140,10 +162,13 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
             self._tl.driver = d
         return d
 
-    def close(self) -> None:
+    def close(self):
+        # Close all Selenium drivers cleanly
+        drivers = []
         with self._drivers_lock:
             drivers = list(self._drivers)
-            self._drivers = []
+            self._drivers.clear()
+
         for d in drivers:
             try:
                 d.quit()
@@ -156,28 +181,142 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
         *,
         wait_css: str | None = None,
         wait_js: str | None = None,
-        timeout_s: float = 25.0,
+        timeout_s: float = 35.0,
     ) -> str:
         driver = self._driver()
-        driver.get(url)
+        try:
+            driver.get(url)
+        except WebDriverException as e:
+            self.log("browser:get:error", url=url, error=str(e))
+            raise
+
+        # Always log where we ended up (redirects, blocks, etc.)
+        try:
+            self.log(
+                "browser:landed",
+                requested=url,
+                current=driver.current_url,
+                title=driver.title or "",
+            )
+        except Exception:
+            pass
 
         if wait_css or wait_js:
-            from selenium.webdriver.support.ui import WebDriverWait
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support import expected_conditions as EC
-
             w = WebDriverWait(driver, timeout_s)
-            if wait_css:
-                w.until(EC.presence_of_element_located((By.CSS_SELECTOR, wait_css)))
-            if wait_js:
-                w.until(lambda drv: bool(drv.execute_script(wait_js)))
+            try:
+                if wait_css:
+                    from selenium.webdriver.common.by import By
+                    from selenium.webdriver.support import expected_conditions as EC
+
+                    w.until(EC.presence_of_element_located((By.CSS_SELECTOR, wait_css)))
+
+                if wait_js:
+                    # If execute_script throws, treat it as “not ready yet”
+                    def _cond(drv):
+                        try:
+                            return bool(drv.execute_script(wait_js))
+                        except Exception:
+                            return False
+
+                    w.until(_cond)
+
+            except TimeoutException:
+                # DO NOT crash. Return HTML so we can see what loaded.
+                try:
+                    snippet = (driver.page_source or "")[:800]
+                except Exception:
+                    snippet = ""
+                self.log(
+                    "browser:wait:timeout",
+                    requested=url,
+                    current=getattr(driver, "current_url", ""),
+                    title=getattr(driver, "title", ""),
+                    wait_css=wait_css or "",
+                    wait_js=wait_js or "",
+                    html_snippet=snippet,
+                )
+                return driver.page_source or ""
+
+        # DEBUG: dump the first listing page HTML for selector tuning
+        try:
+            if "search/jobs" in url and "page=1" in url:
+                with open("leidos_page1.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source or "")
+                self.log("browser:dumped_html", file="leidos_page1.html", url=url)
+        except Exception as e:
+            self.log("browser:dump_html:error", url=url, error=str(e))
 
         return driver.page_source or ""
 
     def run(self) -> None:  # type: ignore[override]
+        """
+        Leidos-style run override:
+        - fetch_data() (listing) uses Selenium via adapter + browser_get_html
+        - parse phase uses a small pool of independent UC drivers
+        """
+        start = time()
+
         try:
-            super().run()
+            self.log("fetch:start")
+            raw = self.fetch_data()  # calls adapter.list_jobs(...)
+            self.log("fetch:done", n=len(raw))
+
+            # Respect testing / limit behaviors from engine (simple version)
+            if getattr(self, "testing", False):
+                limit = int(getattr(self, "test_limit", 15) or 15)
+                raw = raw[:limit]
+            else:
+                cap = getattr(self, "limit_per_scraper", None)
+                if cap is not None:
+                    raw = raw[: int(cap)]
+
+            self.log("parse:start", total=len(raw))
+
+            # Driver pool size: match leidos_scraper defaults (2, or 1 in testing)
+            if getattr(self, "testing", False):
+                driver_workers = 1
+            else:
+                try:
+                    driver_workers = max(
+                        1, int(os.environ.get("LEIDOS_DRIVER_WORKERS", "2"))
+                    )
+                except Exception:
+                    driver_workers = 2
+
+            # Partition items so each thread gets its own driver and reuses it
+            chunks = [[] for _ in range(driver_workers)]
+            for i, item in enumerate(raw):
+                chunks[i % driver_workers].append(item)
+
+            def _worker_wrapper(items):
+                d = self._new_driver()
+                self._tl.driver = d
+                try:
+                    out = []
+                    for r in items:
+                        rec = self.parse_job(r)
+                        if rec:
+                            out.append(rec)
+                    return out
+                finally:
+                    try:
+                        d.quit()
+                    except Exception:
+                        pass
+                    self._tl.driver = None
+
+            parsed = []
+            with ThreadPoolExecutor(max_workers=driver_workers) as ex:
+                futures = [ex.submit(_worker_wrapper, c) for c in chunks if c]
+                for fut in as_completed(futures):
+                    parsed.extend(fut.result())
+
+            self.jobs = parsed
+            self.log("done", count=len(self.jobs))
+            self.log("run:duration", seconds=round(time() - start, 3))
+
         finally:
+            # ✅ THIS is what closes the listing browser + any drivers created
             self.close()
 
     def parse_job(self, raw_job: Dict[str, Any]) -> Optional[Dict[str, Any]]:  # type: ignore[override]
@@ -185,19 +324,52 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
         if not url:
             return None
 
-        if getattr(self.adapter, "skip_detail_fetch", False):
-            artifacts: Dict[str, Any] = {}
-            record = self.adapter.normalize(self.cfg, raw_job, artifacts)
-            record["artifacts"] = artifacts
-            return record
+        # Use worker-owned driver via thread-local (set in run() wrapper)
+        driver = getattr(self._tl, "driver", None)
+        if driver is None:
+            driver = self._new_driver()
+            self._tl.driver = driver
 
-        # optional wait hints for JS-heavy pages
-        pag = getattr(self.cfg, "pagination", {}) or {}
-        wait_css = pag.get("detail_wait_css") or pag.get("wait_css")
-        wait_js = pag.get("detail_wait_js") or pag.get("wait_js")
+        # Wait condition like your working scraper: h1 OR div.job-description-js
+        from selenium.webdriver.support.ui import WebDriverWait
 
-        html = self.browser_get_html(url, wait_css=wait_css, wait_js=wait_js)
-        artifacts = fetch_detail_artifacts_from_html(html, self.log, url)
-        record = self.adapter.normalize(self.cfg, raw_job, artifacts)
-        record["artifacts"] = artifacts
-        return record
+        driver.get(url)
+
+        def _ready(d) -> bool:
+            return bool(
+                d.execute_script(
+                    "return !!document.querySelector('h1') || !!document.querySelector('div.job-description-js');"
+                )
+            )
+
+        WebDriverWait(driver, 30).until(_ready)
+
+        html = driver.page_source or ""
+
+        # Now parse like your leidos_scraper.py does, or feed into your artifact parser
+        # (Keeping it simple and faithful to the working scraper)
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        title_el = soup.find("h1")
+        title = (
+            title_el.get_text(strip=True)
+            if title_el
+            else (raw_job.get("Position Title") or "")
+        )
+
+        desc_el = soup.find("div", class_="job-description-js")
+        description = desc_el.get_text("\n", strip=True) if desc_el else ""
+
+        # Minimal record; extend if you want the exact label extraction like old scraper
+        rec = {
+            "Vendor": getattr(self, "vendor", None)
+            or getattr(self.cfg, "name", "")
+            or self.cfg.company_id,
+            "Posting ID": raw_job.get("Posting ID") or "",
+            "Position Title": title,
+            "Description": description,
+            "Detail URL": url,
+            "_page": raw_job.get("_page"),
+        }
+        return rec
