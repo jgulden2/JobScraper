@@ -26,6 +26,9 @@ from utils.company_config import load_companies_0_2, update_company_status
 from datetime import datetime, date, timezone
 from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
 from scrapers import SCRAPER_REGISTRY as SCRAPER_MAPPING
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class ScraperProtocol(Protocol):

@@ -1,5 +1,5 @@
 {
-    "version": "0.2",
+    "version": "0.3",
     "companies": {
         "rtx": {
             "identity": {
@@ -91,6 +91,163 @@
                     "https://careers.boozallen.com/careers/JobDetail/",
                     "https://careers.boozallen.com/jobs/JobDetail/"
                 ]
+            }
+        },
+        "northrop": {
+            "identity": {
+                "company_id": "northrop",
+                "name": "Northrop Grumman",
+                "domain": "jobs.northropgrumman.com"
+            },
+            "entry_points": {
+                "careers_home": "https://jobs.northropgrumman.com/careers"
+            },
+            "platform": {
+                "name": "apply_v2"
+            },
+            "access_policy": {
+                "max_rps": 2.0,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
+                    "Referer": "https://jobs.northropgrumman.com/careers"
+                }
+            },
+            "discovery_hints": {
+                "type": "api",
+                "pagination": {
+                    "api_url": "https://jobs.northropgrumman.com/api/apply/v2/jobs",
+                    "domains": "ngc.com",
+                    "domain": "ngc.com",
+                    "sort_by": "recent",
+                    "page_size": 100
+                }
+            }
+        },
+        "lockheed": {
+            "identity": {
+                "company_id": "lockheed",
+                "name": "Lockheed Martin",
+                "domain": "www.lockheedmartinjobs.com"
+            },
+            "entry_points": {
+                "careers_home": "https://www.lockheedmartinjobs.com",
+                "search_url": "https://www.lockheedmartinjobs.com/search-jobs"
+            },
+            "platform": {
+                "name": "paged_html_search"
+            },
+            "access_policy": {
+                "max_rps": 1.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "html_search",
+                "pagination": {
+                    "page_param": "page",
+                    "start_page": 1,
+                    "max_pages": 200,
+                    "job_link_selector": "a[href*='/job/']",
+                    "job_url_contains": "/job/",
+                    "posting_id_regex": "(?:/job/)([A-Za-z0-9_-]+)"
+                }
+            }
+        },
+        "usajobs": {
+            "identity": {
+                "company_id": "usajobs",
+                "name": "USAJOBS",
+                "domain": "data.usajobs.gov"
+            },
+            "entry_points": {
+                "careers_home": "https://www.usajobs.gov",
+                "search_url": "https://data.usajobs.gov/api/Search"
+            },
+            "platform": {
+                "name": "usajobs_api"
+            },
+            "access_policy": {
+                "max_rps": 1.0,
+                "headers": {
+                    "Host": "data.usajobs.gov",
+                    "Accept": "application/json"
+                }
+            },
+            "discovery_hints": {
+                "type": "api",
+                "pagination": {
+                    "ResultsPerPage": 50,
+                    "start_page": 1,
+                    "max_pages": 5,
+                    "Fields": "full"
+                }
+            }
+        },
+        "bae": {
+            "identity": {
+                "company_id": "bae",
+                "name": "BAE Systems",
+                "domain": "jobs.baesystems.com"
+            },
+            "entry_points": {
+                "careers_home": "https://jobs.baesystems.com",
+                "search_url": "https://jobs.baesystems.com/global/en/search-results"
+            },
+            "platform": {
+                "name": "phenom_search"
+            },
+            "access_policy": {
+                "max_rps": 1.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "html_search",
+                "pagination": {
+                    "offset_param": "from",
+                    "page_size": 50,
+                    "max_pages": 200,
+                    "fixed_params": {
+                        "s": "1"
+                    },
+                    "detail_path_template": "/global/en/job/{jobId}/"
+                }
+            }
+        },
+        "gd": {
+            "identity": {
+                "company_id": "gd",
+                "name": "General Dynamics",
+                "domain": "www.gd.com"
+            },
+            "entry_points": {
+                "careers_home": "https://www.gd.com/careers",
+                "search_url": "https://www.gd.com/careers/job-search"
+            },
+            "platform": {
+                "name": "encoded_request_api"
+            },
+            "access_policy": {
+                "max_rps": 1.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0"
+                }
+            },
+            "discovery_hints": {
+                "type": "api",
+                "pagination": {
+                    "api_url": "https://www.gd.com/API/Careers/CareerSearch",
+                    "warmup_url": "https://www.gd.com/careers/job-search",
+                    "referer": "https://www.gd.com/careers/job-search",
+                    "page_size": 200,
+                    "use_facet": true,
+                    "list_workers": 6
+                }
             }
         }
     }

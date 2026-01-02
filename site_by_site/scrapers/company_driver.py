@@ -17,14 +17,24 @@ from utils.company_config import CompanyConfig
 from scrapers.platform_adapters.sitemap_job_urls import SitemapJobUrlsAdapter
 from scrapers.platform_adapters.base import Adapter
 from scrapers.platform_adapters.phenom_sitemap import PhenomSitemapAdapter
+from scrapers.platform_adapters.apply_v2 import ApplyV2Adapter
+from scrapers.platform_adapters.paged_html_search import PagedHtmlSearchAdapter
+from scrapers.platform_adapters.usajobs_api import USAJobsApiAdapter
+from scrapers.platform_adapters.phenom_search import PhenomSearchAdapter
+from scrapers.platform_adapters.encoded_request_api import EncodedRequestApiAdapter
 
 
 # -----------------------------
 # Adapter registry
 # -----------------------------
 ADAPTERS = {
-    "sitemap_job_urls": SitemapJobUrlsAdapter,
-    "phenom": PhenomSitemapAdapter,
+    "sitemap_job_urls": SitemapJobUrlsAdapter(),
+    "phenom": PhenomSitemapAdapter(),
+    "apply_v2": ApplyV2Adapter(),
+    "paged_html_search": PagedHtmlSearchAdapter(),
+    "usajobs_api": USAJobsApiAdapter(),
+    "phenom_search": PhenomSearchAdapter(),
+    "encoded_request_api": EncodedRequestApiAdapter(),
 }
 
 
@@ -68,7 +78,13 @@ class CompanyConfigScraper(JobScraper):
         if not url:
             return None
 
-        # The ONLY place detail fetching happens in the spine:
+        # Some platforms (e.g., USAJOBS) are API-first and do not need HTML detail fetching.
+        if getattr(self.adapter, "skip_detail_fetch", False):
+            artifacts: Dict[str, Any] = {}
+            record = self.adapter.normalize(self.cfg, raw_job, artifacts)
+            record["artifacts"] = artifacts
+            return record
+
         artifacts = fetch_detail_artifacts(self.thread_get, self.log, url)
         record = self.adapter.normalize(self.cfg, raw_job, artifacts)
         record["artifacts"] = artifacts
