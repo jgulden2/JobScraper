@@ -1,11 +1,10 @@
 # utils/detail_fetchers.py
-
 from __future__ import annotations
 
 import requests
-
 from typing import Callable, Any, Optional, Dict
 from bs4 import BeautifulSoup as BS
+
 from utils.extractors import (
     extract_phapp_ddo,
     extract_jsonld,
@@ -20,7 +19,7 @@ Logger = Callable[..., None]  # e.g., self.log(event, **kwargs)
 
 def dig(d: Dict[str, Any], *path: str) -> Optional[Any]:
     """
-    Safe nested dict access: _dig(d, "a","b","c") -> d["a"]["b"]["c"] or None.
+    Safe nested dict access: dig(d, "a","b","c") -> d["a"]["b"]["c"] or None.
     """
     cur: Any = d
     for key in path:
@@ -43,62 +42,21 @@ def strip_prefix_keys(d, prefix):
     return out
 
 
-def fetch_detail_artifacts(
-    get: Getter,
+def _parse_detail_artifacts_from_html(
+    html_text: str,
     log: Logger,
     detail_url: str,
     *,
-    timeout: Optional[float] = 30.0,
     get_vendor_blob: bool = True,
     get_jsonld: bool = True,
     get_meta: bool = True,
     get_datalayer: bool = True,
 ) -> Dict[str, Any]:
     """
-    Fetch a job detail page (HTML) and extract standardized artifacts.
+    Parse standardized artifacts from already-fetched HTML (e.g., Selenium page_source).
 
-    This function performs exactly one HTTP GET using the caller's session
-    (typically JobScraper.get), then parses the HTML for common embedded
-    data formats used across vendors:
-
-      - phApp.ddo (Phenom/Workday-style)      -> _vendor_blob (preferred)
-      - #smartApplyData (Northrop-style)      -> _vendor_blob (fallback)
-      - JSON-LD JobPosting blocks             -> _jsonld
-      - <meta> tags                           -> _meta
-      - window.dataLayer.push({...})         -> _datalayer
-      - <link rel="canonical" ...>           -> _canonical_url
-
-    Args:
-        get:    Callable that issues HTTP GET (e.g., self.get). Must return a
-                requests.Response and be configured with retries/headers.
-        log:    Callable for logging (e.g., self.log). Accepts (event, **kwargs).
-        detail_url: Absolute URL of the job detail page.
-        timeout: Optional per-request timeout (seconds).
-        include_jsonld/meta/datalayer: Toggle parsing of those artifacts.
-
-    Returns:
-        Dict[str, Any]: A bundle with:
-            "_vendor_blob": dict | None
-                Raw vendor blob when present (e.g., phApp.ddo or smartApply JSON), else None.
-            "_jsonld": Dict[str, Any] | None
-                Flattened JSON-LD key-value mapping (e.g., "ld.@type", "ld.title", "ld.hiringOrganization.name"), or None if absent.
-            "_meta": Dict[str, str] | None
-                Flattened meta tag mapping with "meta." prefix (e.g., "meta.og:title"), or None if absent.
-            "_datalayer": Dict[str, Any] | None
-                Flattened dataLayer mapping with "datalayer." prefix, or None if absent.
-            "_canonical_url": str | None
-                Canonical URL extracted from the page, or None if not found.
-
-    Notes:
-        - No network calls occur in the extractors; they only parse strings.
-        - We prefer phApp over smartApply for _vendor_blob if both exist.
-        - Callers typically pass this dict straight through to the Canonicalizer.
+    Returns the same bundle shape as fetch_detail_artifacts().
     """
-    # --- 1) Fetch once with the scraper's retrying session ---
-    resp = get(detail_url, timeout=timeout)
-    resp.raise_for_status()
-    html_text = resp.text
-
     soup = BS(html_text, "lxml")
 
     bundle: Dict[str, Any] = {
@@ -107,37 +65,33 @@ def fetch_detail_artifacts(
         "_vendor_blob": None,
     }
 
-    # --- 2) Try to extract vendor-native blobs (preferred -> fallback) ---
-    # 2a) phApp.ddo (Phenom)
+    # --- 1) Vendor-native blob (phApp.ddo) ---
     if get_vendor_blob:
         ph = None
         try:
             ph = extract_phapp_ddo(html_text)
         except ValueError:
-            # Expected on non-Phenom pages; don't pollute logs with "error"
+            # Expected on non-Phenom pages
             log("detail:extract:phapp:miss", level="debug", url=detail_url)
         except Exception as e:
-            # Unexpected parse issues
             log("detail:extract:phapp:error", url=detail_url, error=str(e))
 
         if isinstance(ph, dict) and ph:
-            # Common paths:
-            #   ph.jobDetail.data.job
-            #   ph.jobDetail.job
-            #   ph.data.job
             job = (
                 dig(ph, "jobDetail", "data", "job")
                 or dig(ph, "jobDetail", "job")
                 or dig(ph, "data", "job")
-                or ph  # last resort: whole blob
+                or ph
             )
             if isinstance(job, dict) and job:
                 bundle["_vendor_blob"] = job
                 log("detail:extract:phapp:ok", url=detail_url)
 
-    # --- 3) Optional secondary artifacts (schema/meta/analytics/canonical) ---
+    # --- 2) Secondary artifacts (JSON-LD / meta / datalayer / canonical) ---
     if get_jsonld:
         try:
+            # Your extractor returns flattened keys with "ld." prefix in many cases;
+            # we strip it here to keep downstream consistent.
             bundle["_jsonld"] = strip_prefix_keys(extract_jsonld(soup), "ld.")
         except Exception as e:
             log("detail:extract:jsonld:error", url=detail_url, error=str(e))
@@ -160,3 +114,63 @@ def fetch_detail_artifacts(
         log("detail:extract:canonical:error", url=detail_url, error=str(e))
 
     return bundle
+
+
+def fetch_detail_artifacts(
+    get: Getter,
+    log: Logger,
+    detail_url: str,
+    *,
+    timeout: Optional[float] = 30.0,
+    get_vendor_blob: bool = True,
+    get_jsonld: bool = True,
+    get_meta: bool = True,
+    get_datalayer: bool = True,
+) -> Dict[str, Any]:
+    """
+    Fetch a job detail page (HTML) and extract standardized artifacts.
+
+    Exactly one HTTP GET (via provided `get`), then parse HTML into:
+      - _vendor_blob (phApp.ddo when present)
+      - _jsonld
+      - _meta
+      - _datalayer
+      - _canonical_url
+    """
+    resp = get(detail_url, timeout=timeout)
+    resp.raise_for_status()
+    html_text = resp.text
+
+    return _parse_detail_artifacts_from_html(
+        html_text,
+        log,
+        detail_url,
+        get_vendor_blob=get_vendor_blob,
+        get_jsonld=get_jsonld,
+        get_meta=get_meta,
+        get_datalayer=get_datalayer,
+    )
+
+
+def fetch_detail_artifacts_from_html(
+    html_text: str,
+    log: Logger,
+    detail_url: str,
+    *,
+    get_vendor_blob: bool = True,
+    get_jsonld: bool = True,
+    get_meta: bool = True,
+    get_datalayer: bool = True,
+) -> Dict[str, Any]:
+    """
+    Parse artifacts from HTML already obtained out-of-band (e.g. Selenium).
+    """
+    return _parse_detail_artifacts_from_html(
+        html_text,
+        log,
+        detail_url,
+        get_vendor_blob=get_vendor_blob,
+        get_jsonld=get_jsonld,
+        get_meta=get_meta,
+        get_datalayer=get_datalayer,
+    )

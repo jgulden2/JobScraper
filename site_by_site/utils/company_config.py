@@ -134,7 +134,7 @@ def update_company_status(
     status_path: str | Path = "configs/company_status.json",
 ) -> None:
     p = Path(status_path)
-    doc = _load_json(p) if p.exists() else {"version": "0.2", "status": {}}
+    doc = _load_json(p) if p.exists() else {"version": "0.3", "status": {}}
     st = doc.setdefault("status", {}).setdefault(
         company_id,
         {

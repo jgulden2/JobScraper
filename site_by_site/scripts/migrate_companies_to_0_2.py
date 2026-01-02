@@ -14,11 +14,11 @@ def domain_from_url(u: str) -> str:
 
 
 src = Path("configs/companies.json")  # your old format
-dst = Path("configs/companies.0.2.json")
+dst = Path("configs/companies.0.3.json")
 
 raw = json.loads(src.read_text(encoding="utf-8"))
 
-out = {"version": "0.2", "companies": {}}
+out = {"version": "0.3", "companies": {}}
 
 for key, cfg in raw.items():
     name = cfg.get("name") or cfg.get("vendor") or key

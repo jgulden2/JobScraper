@@ -249,6 +249,101 @@
                     "list_workers": 6
                 }
             }
+        },
+        "boeing": {
+            "identity": {
+                "company_id": "boeing",
+                "name": "Boeing",
+                "domain": "jobs.boeing.com"
+            },
+            "entry_points": {
+                "careers_home": "https://jobs.boeing.com",
+                "sitemap_url": "https://jobs.boeing.com/sitemap.xml"
+            },
+            "access_policy": {
+                "max_rps": 1.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "sitemap",
+                "job_url_contains": "/job/"
+            }
+        },
+        "hii": {
+            "identity": {
+                "company_id": "hii",
+                "name": "HII (Huntington Ingalls Industries)",
+                "domain": "careers.huntingtoningalls.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.huntingtoningalls.com",
+                "search_url": "https://careers.huntingtoningalls.com/search/"
+            },
+            "platform": {
+                "name": "paged_html_search"
+            },
+            "access_policy": {
+                "max_rps": 1.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept-Language": "en-US,en;q=0.9"
+                }
+            },
+            "discovery_hints": {
+                "type": "html_search",
+                "pagination": {
+                    "offset_param": "startrow",
+                    "start_offset": 0,
+                    "page_size": 25,
+                    "max_pages": 400,
+                    "fixed_params": {
+                        "q": "",
+                        "sortColumn": "referencedate",
+                        "sortDirection": "desc"
+                    },
+                    "job_link_selector": "a.jobTitle-link",
+                    "job_url_contains": "/job/",
+                    "posting_id_regex": "(?:/job/)([A-Za-z0-9_-]+)"
+                }
+            }
+        },
+        "leidos": {
+            "identity": {
+                "company_id": "leidos",
+                "name": "Leidos",
+                "domain": "careers.leidos.com"
+            },
+            "entry_points": {
+                "careers_home": "https://careers.leidos.com",
+                "search_url": "https://careers.leidos.com/search/jobs/in?page={page}&q=#"
+            },
+            "platform": {
+                "name": "selenium_paged_html_search"
+            },
+            "access_policy": {
+                "requires_browser_bootstrap": true,
+                "max_rps": 0.5,
+                "headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                }
+            },
+            "discovery_hints": {
+                "type": "html_search",
+                "pagination": {
+                    "start_page": 1,
+                    "max_pages": 200,
+                    "job_link_selector": "div.jobs-section__item a[href]",
+                    "job_url_contains": "/job/",
+                    "posting_id_regex": "(?:/job/)([0-9]+)",
+                    "wait_js": "return document.querySelectorAll('div.jobs-section__item').length > 0;",
+                    "detail_wait_js": "return document.readyState === 'complete';"
+                }
+            }
         }
     }
 }

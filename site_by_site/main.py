@@ -21,7 +21,7 @@ from pathlib import Path
 from time import time
 from utils.geocode import geocode_unique
 from utils.transforms import parse_date
-from scrapers.company_driver import CompanyConfigScraper
+from scrapers.company_driver import CompanyConfigScraper, BrowserCompanyConfigScraper
 from utils.company_config import load_companies_0_2, update_company_status
 from datetime import datetime, date, timezone
 from typing import Mapping, Optional, Protocol, Sequence, Type, List, Dict
@@ -502,12 +502,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
 
     # -----------------------------
-    # Config-driven company runs (Phase 0.2)
+    # Config-driven company runs (Phase 0.3)
     # -----------------------------
     if args.companies_config:
         companies = load_companies_0_2(
             args.companies_config
-        )  # 0.2 schema validation + status merge
+        )  # 0.3 schema validation + status merge
         selected = list(args.companies or companies.keys())
 
         built = []
@@ -524,7 +524,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 continue
 
             cfg = companies[cid]
-            s = CompanyConfigScraper(cfg)
+            if bool(getattr(cfg, "requires_browser_bootstrap", False)):
+                s = BrowserCompanyConfigScraper(cfg)
+            else:
+                s = CompanyConfigScraper(cfg)
 
             # Keep behavior aligned with run_scraper()
             s.testing = bool(testing_like)
@@ -552,7 +555,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
             out = out_dir / f"{cid}_jobs.csv"
 
-            # 0.2: operational controls
+            # 0.3: operational controls
             if getattr(cfg, "disabled", False):
                 logging.getLogger(__name__).info(
                     "company:disabled:skip",
