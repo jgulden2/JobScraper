@@ -1,11 +1,3 @@
-"""
-Phase 0.3 Contract (Listing vs Detail split)
-- Platform adapters do LISTING only: return stable IDs + detail URLs (+ optional minimal metadata)
-- Driver owns DETAIL fetching: fetch_detail_artifacts() happens here, not inside adapters
-- Adapters map artifacts -> raw record via normalize()
-Legacy company-specific scrapers may exist until Phase 1 migration.
-"""
-
 # scrapers/company_driver.py
 from __future__ import annotations
 

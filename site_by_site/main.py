@@ -517,12 +517,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
 
     # -----------------------------
-    # Config-driven company runs (Phase 0.3)
+    # Config-driven company runs (Phase 1.1)
     # -----------------------------
     if args.companies_config:
         companies = load_companies_0_2(
             args.companies_config
-        )  # 0.3 schema validation + status merge
+        )
         selected = list(args.companies or companies.keys())
 
         built = []
@@ -570,7 +570,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
             out = out_dir / f"{cid}_jobs.csv"
 
-            # 0.3: operational controls
             if getattr(cfg, "disabled", False):
                 logging.getLogger(__name__).info(
                     "company:disabled:skip",
