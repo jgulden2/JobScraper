@@ -55,6 +55,12 @@ class CompanyConfigScraper(JobScraper):
         headers = cfg.headers or {}
         super().__init__(base_url=base_url, headers=headers)
 
+        # Phase 1.3: enforce per-company access policy
+        try:
+            self.max_rps = float(getattr(cfg, "max_rps", 2.0) or 2.0)
+        except Exception:
+            self.max_rps = 2.0
+
         self.cfg = cfg
         self.VENDOR = cfg.name
         self.vendor = cfg.name
@@ -211,6 +217,12 @@ class BrowserCompanyConfigScraper(CompanyConfigScraper):
         timeout_s: float = 35.0,
     ) -> str:
         driver = self._driver()
+        # Phase 1.3: apply the same per-host throttle to browser traffic
+        try:
+            self._rate_limit(url)  # defined on JobScraper
+        except Exception:
+            pass
+
         try:
             driver.get(url)
         except WebDriverException as e:

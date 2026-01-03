@@ -25,6 +25,9 @@ from requests.adapters import HTTPAdapter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib3.util.retry import Retry
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+from time import sleep
+
 
 from utils.schema import CANON_COLUMNS
 from utils.canonicalize import canonicalize_record
@@ -106,6 +109,12 @@ class JobScraper:
         # --- metrics ---
         self.metrics = Metrics(self.__class__.__name__.replace("Scraper", "").lower())
 
+        # --- access policy knobs (Phase 1.3) ---
+        # max requests-per-second per HOST (not global)
+        self.max_rps: float = 2.0
+        self._rl_lock = threading.Lock()
+        self._rl_last_ts: Dict[str, float] = {}
+
     # ------------------------------------------------------------------
     # Thread-local requests.Session to keep sessions safe across threads
     # ------------------------------------------------------------------
@@ -133,6 +142,39 @@ class JobScraper:
         setattr(self._thread_local, "session", s)
         return s
 
+    def _rate_limit(self, url: str) -> None:
+        """
+        Enforce per-host max_rps. Thread-safe.
+        """
+        try:
+            host = urlparse(url).netloc or ""
+        except Exception:
+            host = ""
+
+        rps = float(getattr(self, "max_rps", 0) or 0)
+        if rps <= 0:
+            return  # 0 or negative => no throttling
+
+        min_interval = 1.0 / max(0.0001, rps)
+
+        with self._rl_lock:
+            now = time()
+            last = self._rl_last_ts.get(host, 0.0)
+            wait = (last + min_interval) - now
+            if wait > 0:
+                # release lock while sleeping so other threads can compute wait too
+                pass
+            else:
+                self._rl_last_ts[host] = now
+                return
+
+        # Sleep outside the lock
+        if wait > 0:
+            sleep(wait)
+
+        with self._rl_lock:
+            self._rl_last_ts[host] = time()
+
     def thread_get(self, url: str, **kwargs: Any) -> requests.Response:
         """
         GET using a thread-local requests.Session (safe under a ThreadPool).
@@ -141,6 +183,7 @@ class JobScraper:
         headers = {**(self.headers or {}), **(kwargs.pop("headers", {}) or {})}
         params = {**(self.params or {}), **(kwargs.pop("params", {}) or {})}
         timeout = kwargs.pop("timeout", self.default_timeout)
+        self._rate_limit(url)
         return self._get_thread_session().get(
             url, headers=headers, params=params, timeout=timeout, **kwargs
         )
@@ -388,6 +431,8 @@ class JobScraper:
         # Merge base headers/params with per-call ones
         merged_headers = {**(self.headers or {}), **(headers or {})}
         merged_params = {**(self.params or {}), **(params or {})}
+
+        self._rate_limit(url)
 
         resp = self.session.request(
             method=method,
