@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import threading
 import json
+import sys
+import io
 import logging
 import pandas as pd
 
@@ -96,11 +98,25 @@ def configure_logging(logfile: Optional[str], suppress_console: bool) -> None:
         ValueError: If logging configuration fails due to invalid handler/formatter setup.
     """
     handlers: list[logging.Handler] = []
+
     if logfile:
-        handlers.append(logging.FileHandler(logfile))
-    if not suppress_console and not logfile:
-        # If a log file is provided, we default to file-only to keep the console quiet.
-        handlers.append(logging.StreamHandler())
+        # File-only by default (old behavior), but force UTF-8
+        try:
+            fh = logging.FileHandler(logfile, encoding="utf-8", errors="replace")
+        except TypeError:
+            fh = logging.FileHandler(logfile, encoding="utf-8")
+        handlers.append(fh)
+    else:
+        # No logfile => console logging (force UTF-8)
+        if not suppress_console:
+            try:
+                stream = io.TextIOWrapper(
+                    sys.stdout.buffer, encoding="utf-8", errors="replace"
+                )
+            except Exception:
+                stream = sys.stdout
+            handlers.append(logging.StreamHandler(stream=stream))
+
     if not handlers:
         handlers.append(logging.NullHandler())
 
@@ -270,9 +286,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--scrapers",
         nargs="*",
-        choices=SCRAPER_MAPPING.keys(),
-        help="Specify one or more scrapers to run. If omitted, all will run.",
+        help="LEGACY (disabled): per-company scrapers have been migrated to config-driven mode.",
     )
+
     parser.add_argument(
         "--logfile",
         type=str,
@@ -378,8 +394,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--companies-config",
-        default=None,
-        help="Path to companies JSON config (enables config-driven company runs).",
+        default="configs/companies.1.1.json",
+        help="Path to companies JSON config (default: configs/companies.1.1.json).",
     )
     parser.add_argument(
         "--companies",
@@ -409,6 +425,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     args = parse_args(argv)
     configure_logging(args.logfile, args.suppress)
+
+    # Phase 1.2 gate: if a company exists in the companies config, it must run via config mode.
+    if args.scrapers:
+        raise SystemExit(
+            "Legacy --scrapers mode is disabled.\n"
+            "All companies must be run via --companies / --companies-config."
+        )
 
     if PHASE_1_NO_NEW_COMPANY_SCRAPERS and not args.companies_config:
         logging.getLogger(__name__).warning(
@@ -520,9 +543,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Config-driven company runs (Phase 1.1)
     # -----------------------------
     if args.companies_config:
-        companies = load_companies_0_2(
-            args.companies_config
-        )
+        companies = load_companies_0_2(args.companies_config)
         selected = list(args.companies or companies.keys())
 
         built = []
